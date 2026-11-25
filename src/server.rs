@@ -1,11 +1,11 @@
-//! Máy chủ HTTPS + WebSocket cho iPhone (Safari chỉ cho dùng micro trên trang HTTPS).
+//! Máy chủ HTTPS + WebSocket cho điện thoại (trình duyệt di động chỉ cho dùng micro trên trang HTTPS).
 //!
 //! Giao thức WebSocket:
-//!   iPhone -> PC  (text) {"t":"hello","rate":48000}   bắt đầu, báo tần số lấy mẫu
+//!   điện thoại -> PC  (text) {"t":"hello","rate":48000}   bắt đầu, báo tần số lấy mẫu
 //!                        {"t":"set","p":{"thr":-50}}   đổi một phần thông số
 //!                        {"t":"preset","name":"game"}  áp cấu hình nhanh
-//!   iPhone -> PC  (binary) PCM 16-bit little-endian, mono
-//!   PC -> iPhone  (text) {"t":"ready"} | {"t":"state","p":{...}} | {"t":"meter",...}
+//!   điện thoại -> PC  (binary) PCM 16-bit little-endian, mono
+//!   PC -> điện thoại  (text) {"t":"ready"} | {"t":"state","p":{...}} | {"t":"meter",...}
 
 use crate::dsp::Resampler;
 use crate::i18n::{self, t, tf};
@@ -30,7 +30,7 @@ use std::sync::atomic::Ordering::{Relaxed, SeqCst};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-// Trang iPhone viết bằng React + TypeScript (thư mục web/), build bằng `npm run build`
+// Trang điện thoại viết bằng React + TypeScript (thư mục web/), build bằng `npm run build`
 // rồi nhúng thẳng vào file .exe.
 const PHONE_HTML: &str = include_str!("../web/dist/index.html");
 const PHONE_JS: &str = include_str!("../web/dist/assets/app.js");
@@ -164,7 +164,7 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                                 }
                             }
                             "pong" => {
-                                // đo thời gian khứ hồi tới iPhone, làm mượt
+                                // đo thời gian khứ hồi tới điện thoại, làm mượt
                                 if let Some(ts) = m.ts {
                                     let rtt = now_ms().saturating_sub(ts).min(5_000) as f32;
                                     let old = sh.rtt_ms.load(Relaxed) as f32;
@@ -271,7 +271,44 @@ fn load_or_make_cert(ip: &str) -> Result<(String, String), String> {
     Ok((c, k))
 }
 
+/// Địa chỉ IPv4 riêng của PC ngoài địa chỉ chính: card mạng chia sẻ qua USB/Bluetooth, điểm phát sóng...
+/// Bỏ card ảo (VM, Docker, WSL) cho QR đỡ dài.
+fn other_hosts(primary: &str) -> Vec<String> {
+    let Ok(list) = local_ip_address::list_afinet_netifas() else { return Vec::new() };
+    let mut out: Vec<String> = Vec::new();
+    for (name, ip) in list {
+        let IpAddr::V4(v4) = ip else { continue };
+        let lname = name.to_lowercase();
+        let virt = ["vethernet", "vmware", "virtualbox", "vbox", "loopback", "docker", "wsl", "hyper-v", "tailscale", "zerotier"];
+        if v4.is_loopback() || v4.is_link_local() || !v4.is_private() || virt.iter().any(|v| lname.contains(v)) {
+            continue;
+        }
+        let s = v4.to_string();
+        if s != primary && !out.contains(&s) {
+            out.push(s);
+        }
+    }
+    out.truncate(3);
+    out
+}
+
 pub fn spawn(sh: Arc<Shared>) {
+    // Cập nhật danh sách địa chỉ phụ mỗi vài giây: card mạng USB/Bluetooth chỉ xuất hiện sau khi cắm cáp hoặc bật chia sẻ mạng
+    let hosts_sh = sh.clone();
+    let _ = std::thread::Builder::new().name("hosts".into()).spawn(move || loop {
+        let primary = hosts_sh.url.lock().clone();
+        let primary = primary.trim_start_matches("https://").split(':').next().unwrap_or("").to_string();
+        if !primary.is_empty() {
+            let now = other_hosts(&primary);
+            let mut cur = hosts_sh.alt_hosts.lock();
+            if *cur != now {
+                *cur = now;
+                drop(cur);
+                hosts_sh.wake_ui();
+            }
+        }
+        std::thread::sleep(Duration::from_secs(3));
+    });
     std::thread::Builder::new()
         .name("server".into())
         .spawn(move || {

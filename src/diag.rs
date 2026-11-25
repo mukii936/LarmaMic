@@ -44,7 +44,7 @@ pub fn build(sh: &Shared, devices: &[String], out_sel: &str, hk_err: Option<&str
         line(tf("diag.server.err", &[&e]));
     }
     let state = t(if sh.connected.load(Relaxed) { "diag.conn" } else { "diag.wait" });
-    line(tf("diag.iphone", &[&state]));
+    line(tf("diag.phone", &[&state]));
     let why = sh.last_disconnect.lock().clone();
     if !why.is_empty() {
         line(tf("diag.lastdisc", &[&why]));

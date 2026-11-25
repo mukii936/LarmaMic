@@ -1,5 +1,5 @@
 //! Giao diện egui: kết nối + QR bên trái, đồng hồ và bộ chỉnh bên phải.
-//! Thông số đồng bộ hai chiều với trang iPhone qua `Shared::params_ver`.
+//! Thông số đồng bộ hai chiều với trang điện thoại qua `Shared::params_ver`.
 
 use crate::dsp::{eq_response_db, BANDS};
 use crate::engine::{self, load_f, Cmd, Shared};
@@ -276,7 +276,7 @@ impl App {
                 profs.push(Profile { name, params });
             }
         }
-        self.sh.params_ver.fetch_add(1, Relaxed); // để iPhone nhận danh sách hồ sơ mới
+        self.sh.params_ver.fetch_add(1, Relaxed); // để điện thoại nhận danh sách hồ sơ mới
         self.saving_profile = false;
         self.persist(true);
     }
@@ -352,7 +352,7 @@ impl App {
         apply_fonts(ctx, l, false);
         self.menu_fonts = false;
         crate::win::relabel_tray();
-        self.sh.params_ver.fetch_add(1, Relaxed); // để trang iPhone nhận ngôn ngữ mới
+        self.sh.params_ver.fetch_add(1, Relaxed); // để trang điện thoại nhận ngôn ngữ mới
         self.persist(true);
     }
 
@@ -386,9 +386,11 @@ impl App {
         if base.is_empty() {
             ui.label(RichText::new(t("srv.starting")).color(MUTE));
         } else {
-            // Mã ghép nối nằm trong địa chỉ (và QR): không có mã đúng thì iPhone không gửi được tiếng vào PC
+            // Mã ghép nối nằm trong địa chỉ (và QR): không có mã đúng thì điện thoại không gửi được tiếng vào PC
             let token = self.sh.token.read().clone();
-            let url = format!("{base}/?k={token}");
+            let alt = self.sh.alt_hosts.lock().clone();
+            // "h" lists the PC's other addresses; the phone tries them in turn (USB / Bluetooth tethering, hotspot)
+            let url = if alt.is_empty() { format!("{base}/?k={token}") } else { format!("{base}/?k={token}&h={}", alt.join(",")) };
             self.draw_qr(ui, &url);
             ui.add_space(4.0);
             ui.label(RichText::new(t("pair.scan")).size(14.0).color(MUTE));
@@ -409,7 +411,10 @@ impl App {
                 }
             });
             ui.add_space(2.0);
-            ui.label(RichText::new(t("pair.safari")).small().color(MUTE));
+            if !alt.is_empty() {
+                ui.label(RichText::new(tf("pair.alt", &[&alt.join(", ")])).small().color(SIG));
+            }
+            ui.label(RichText::new(t("pair.cert")).small().color(MUTE));
         }
 
         ui.add_space(14.0);
@@ -643,7 +648,7 @@ impl App {
             }
         });
 
-        // hồ sơ riêng: lưu cấu hình của bạn, đổi nhanh ở đây hoặc trên iPhone
+        // hồ sơ riêng: lưu cấu hình của bạn, đổi nhanh ở đây hoặc trên điện thoại
         ui.add_space(6.0);
         ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new(t("prof.label")).color(MUTE));
@@ -1086,7 +1091,7 @@ impl eframe::App for App {
         // Chỉ vẽ lại khi cần, để không tốn CPU/GPU/điện:
         //  - cửa sổ ẩn hoặc thu nhỏ: không hẹn vẽ (sự kiện khay/phím tắt sẽ đánh thức lại khi cần)
         //  - đang có tiếng hoặc đang đo: 30 khung/giây (15 nếu không phải cửa sổ đang chọn)
-        //  - rảnh, chưa có iPhone: vài lần mỗi giây
+        //  - rảnh, chưa có điện thoại: vài lần mỗi giây
         if self.start_hidden || crate::win::is_visible() {
             let focused = ctx.input(|i| i.viewport().focused.unwrap_or(true));
             let active = self.sh.connected.load(Relaxed)
@@ -1107,7 +1112,7 @@ impl eframe::App for App {
             *self.sh.out_name.lock() = self.out_sel.clone();
         }
 
-        // thông số vừa đổi từ iPhone: nhận về trước khi vẽ
+        // thông số vừa đổi từ điện thoại: nhận về trước khi vẽ
         let ver = self.sh.params_ver.load(Relaxed);
         if ver != self.last_ver {
             self.p = *self.sh.params.read();
@@ -1125,7 +1130,7 @@ impl eframe::App for App {
             .frame(egui::Frame::default().fill(BG).inner_margin(22.0))
             .show(ctx, |ui| self.main_panel(ui, dt));
 
-        // thay đổi từ app PC: đẩy sang bộ xử lý và iPhone
+        // thay đổi từ app PC: đẩy sang bộ xử lý và điện thoại
         if *self.sh.params.read() != self.p {
             self.sh.set_params(self.p);
             self.last_ver = self.sh.params_ver.load(Relaxed);

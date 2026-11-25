@@ -191,7 +191,7 @@ fn spawn_events(sh: Arc<engine::Shared>, ctx: egui::Context, ids: Option<TrayIds
                         // đóng file ghi âm đang mở để không để lại file WAV dở dang
                         sh.rec_req.store(2, Relaxed);
                         std::thread::sleep(Duration::from_millis(250));
-                        // giữ nguyên thiết bị đã lưu, chỉ cập nhật thông số và hồ sơ (iPhone có thể vừa chỉnh)
+                        // giữ nguyên thiết bị đã lưu, chỉ cập nhật thông số và hồ sơ (điện thoại có thể vừa chỉnh)
                         let mut s = settings::load();
                         s.params = *sh.params.read();
                         s.profiles = sh.profiles.read().clone();

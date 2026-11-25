@@ -121,7 +121,7 @@ export function t(key: Key, ...args: (string | number)[]): string {
   return s;
 }
 
-/** Tên trình duyệt đang dùng, để hướng dẫn nhắc đúng tên (Safari trên iPhone, Chrome trên Android...). */
+/** Tên trình duyệt đang dùng, để hướng dẫn nhắc đúng tên (Safari trên iPhone/iPad, Chrome trên Android...). */
 export function browserName(): string {
   const ua = navigator.userAgent;
   if (/FxiOS|Firefox/.test(ua)) return 'Firefox';

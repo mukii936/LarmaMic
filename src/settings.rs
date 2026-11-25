@@ -38,7 +38,7 @@ impl Default for Params {
 }
 
 impl Params {
-    /// Ép mọi giá trị về khoảng hợp lệ (iPhone gửi gì lên cũng không làm hỏng bộ lọc).
+    /// Ép mọi giá trị về khoảng hợp lệ (điện thoại gửi gì lên cũng không làm hỏng bộ lọc).
     pub fn sanitized(mut self) -> Self {
         fn c(v: f32, lo: f32, hi: f32) -> f32 {
             if v.is_finite() { v.clamp(lo, hi) } else { lo }
@@ -131,7 +131,7 @@ pub struct Saved {
     pub params: Params,
     /// Rỗng = tự tìm VB-Cable.
     pub out_device: String,
-    /// Mã ghép nối nằm trong QR; iPhone không có mã đúng thì không gửi được tiếng vào PC.
+    /// Mã ghép nối nằm trong QR; điện thoại không có mã đúng thì không gửi được tiếng vào PC.
     pub token: String,
     /// Phím tắt tắt/bật tiếng, ví dụ "ctrl+alt+KeyM". Rỗng = mặc định; "off" = không dùng.
     pub hotkey: String,

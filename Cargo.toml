@@ -1,8 +1,8 @@
 [package]
 name = "larma-mic"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
-description = "Dùng iPhone làm mic cho PC: nhận âm thanh qua Wi-Fi, lọc ồn RNNoise, xuất ra mic ảo (VB-Cable)"
+description = "Use a phone (iPhone or Android) as a PC microphone: audio over Wi-Fi, USB or Bluetooth tethering, RNNoise noise removal, output to a virtual mic (VB-Cable or Steam)"
 
 [dependencies]
 eframe = "0.31"

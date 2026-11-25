@@ -65,7 +65,7 @@ const fresh = (): Session => ({
 
 /**
  * Lấy mic gửi PCM 16-bit sang app LarmaMic, và đồng bộ thông số xử lý hai chiều:
- * chỉnh trên iPhone thì PC đổi theo, chỉnh trên PC thì iPhone đổi theo.
+ * chỉnh trên điện thoại thì PC đổi theo, chỉnh trên PC thì điện thoại đổi theo.
  *
  * iOS dừng micro của trang web khi khóa màn hình hoặc thoát Safari. Khi quay lại trang,
  * hook tự mở lại micro và kết nối lại PC, không cần bấm nút.
@@ -298,7 +298,7 @@ export function useMic() {
     }
   }, [connect, failWith, holdScreen, openAudio, teardown]);
 
-  /** Đổi một thông số: hiện ngay trên iPhone, gom lại rồi gửi sang PC mỗi ~40 ms. */
+  /** Đổi một thông số: hiện ngay trên điện thoại, gom lại rồi gửi sang PC mỗi ~40 ms. */
   const setParam = useCallback(
     (key: NumKey | BoolKey, value: number | boolean) => {
       lastEdit.current = Date.now();

@@ -1,4 +1,4 @@
-# Build LarmaMic: trang iPhone (React + TS) -> nhúng vào app Rust -> larma-mic.exe
+# Build LarmaMic: trang web cho điện thoại (React + TS) -> nhúng vào app Rust -> larma-mic.exe
 # Chạy:  .\build.ps1
 $ErrorActionPreference = 'Stop'
 $env:Path += ";$env:USERPROFILE\.cargo\bin"

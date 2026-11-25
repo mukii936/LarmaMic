@@ -69,7 +69,7 @@ fn main() {
         let mut res = winresource::WindowsResource::new();
         res.set_icon(ico.to_str().expect("đường dẫn icon không hợp lệ"));
         res.set("ProductName", "LarmaMic");
-        res.set("FileDescription", "LarmaMic: use your iPhone as a PC microphone");
+        res.set("FileDescription", "LarmaMic: use your phone as a PC microphone");
         res.set("InternalName", "larma-mic");
         res.set("OriginalFilename", "larma-mic.exe");
         if let Err(e) = res.compile() {

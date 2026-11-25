@@ -1,4 +1,4 @@
-//! Lõi âm thanh: hàng đợi nhận từ iPhone -> luồng DSP -> hàng đợi xuất -> thiết bị (VB-Cable).
+//! Lõi âm thanh: hàng đợi nhận từ điện thoại -> luồng DSP -> hàng đợi xuất -> thiết bị (VB-Cable).
 //!
 //! Luồng DSP chỉ xử lý thêm khi hàng đợi xuất còn ít, nên bộ đệm chống giật nằm ở hàng đợi
 //! nhận và độ trễ tổng ≈ buf_ms + ~30 ms.
@@ -30,7 +30,7 @@ pub type Queue = Arc<Mutex<VecDeque<f32>>>;
 
 pub struct Shared {
     pub params: RwLock<Params>,
-    /// Tăng mỗi khi thông số đổi (từ app PC hoặc từ iPhone) để các bên biết mà đồng bộ.
+    /// Tăng mỗi khi thông số đổi (từ app PC hoặc từ điện thoại) để các bên biết mà đồng bộ.
     pub params_ver: AtomicU64,
     pub input: Mutex<InputQ>,
     pub out_q: Queue,
@@ -50,11 +50,13 @@ pub struct Shared {
     pub drops: AtomicU32,
     // trạng thái hiển thị
     pub url: Mutex<String>,
+    /// Các địa chỉ khác của PC (chia sẻ mạng qua USB/Bluetooth, điểm phát sóng): đưa vào QR để điện thoại tự thử lần lượt.
+    pub alt_hosts: Mutex<Vec<String>>,
     pub server_err: Mutex<Option<String>>,
     pub out_err: Mutex<Option<String>>,
     /// Tên thiết bị đầu ra đang chọn (để lưu khi thoát từ khay).
     pub out_name: Mutex<String>,
-    /// Mã ghép nối hiện hành (đổi được từ giao diện, iPhone phải gửi đúng mã mới được nối).
+    /// Mã ghép nối hiện hành (đổi được từ giao diện, điện thoại phải gửi đúng mã mới được nối).
     pub token: RwLock<String>,
     /// Phát tiếng bíp khi bật/tắt tiếng bằng phím tắt hoặc menu khay.
     pub beep: AtomicBool,
@@ -63,12 +65,12 @@ pub struct Shared {
     pub cal_state: AtomicU8,
     pub cal_progress: AtomicU32,
     pub cal_noise: AtomicU32,
-    /// Hồ sơ riêng (nguồn chính; giao diện và iPhone cùng đọc/ghi).
+    /// Hồ sơ riêng (nguồn chính; giao diện và điện thoại cùng đọc/ghi).
     pub profiles: RwLock<Vec<Profile>>,
     /// Phổ âm đầu ra (dBFS theo 48 băng). Chỉ được cập nhật khi giao diện đang xem (`spec_until`).
     pub spectrum: Mutex<[f32; BANDS]>,
     pub spec_until: AtomicU64,
-    /// Thời gian khứ hồi tới iPhone (ms, làm mượt), 0 = chưa đo.
+    /// Thời gian khứ hồi tới điện thoại (ms, làm mượt), 0 = chưa đo.
     pub rtt_ms: AtomicU32,
     // ghi âm WAV: 1 = bắt đầu, 2 = dừng (luồng DSP xử lý)
     pub rec_req: AtomicU8,
@@ -129,6 +131,7 @@ impl Shared {
             under: AtomicU32::new(0),
             drops: AtomicU32::new(0),
             url: Mutex::new(String::new()),
+            alt_hosts: Mutex::new(Vec::new()),
             server_err: Mutex::new(None),
             out_err: Mutex::new(None),
             out_name: Mutex::new(String::new()),
@@ -186,7 +189,7 @@ impl Shared {
         }
     }
 
-    /// Độ trễ ước tính từ lúc nói đến lúc tiếng ra thiết bị (ms). Gồm: lấy mẫu trên iPhone,
+    /// Độ trễ ước tính từ lúc nói đến lúc tiếng ra thiết bị (ms). Gồm: lấy mẫu trên điện thoại,
     /// đường truyền (nửa khứ hồi), đệm chống giật, hàng đợi xuất, xử lý và bộ đệm của thiết bị.
     pub fn latency_ms(&self) -> u32 {
         let p = *self.params.read();
@@ -199,7 +202,7 @@ impl Shared {
         total.round() as u32
     }
 
-    /// Gộp một phần thông số từ iPhone (JSON). Không cho iPhone đổi `monitor` (nghe thử trên PC).
+    /// Gộp một phần thông số từ điện thoại (JSON). Không cho điện thoại đổi `monitor` (nghe thử trên PC).
     pub fn merge_json(&self, v: &serde_json::Value) {
         let cur = *self.params.read();
         let (Ok(mut base), Some(inc)) = (serde_json::to_value(cur), v.as_object()) else { return };
@@ -269,7 +272,7 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                     sh.cal_state.store(1, Relaxed);
                     store_f(&sh.cal_progress, 0.0);
                 }
-                // đang đo mà quá 7 giây không có âm thanh (iPhone ngắt kết nối): báo thất bại
+                // đang đo mà quá 7 giây không có âm thanh (điện thoại ngắt kết nối): báo thất bại
                 if cal.as_ref().is_some_and(|(t0, _)| t0.elapsed() > Duration::from_secs(7)) {
                     cal = None;
                     sh.cal_state.store(3, Relaxed);
@@ -312,7 +315,7 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                         store_f(&sh.in_db, -99.0);
                         store_f(&sh.out_db, -99.0);
                     }
-                    // Có iPhone nối thì thức dậy dày để bắt kịp gói; chưa có thì ngủ lâu cho đỡ tốn điện
+                    // Có điện thoại nối thì thức dậy dày để bắt kịp gói; chưa có thì ngủ lâu cho đỡ tốn điện
                     let busy = sh.connected.load(Relaxed) || cal.is_some();
                     std::thread::sleep(Duration::from_millis(if busy { 3 } else { 30 }));
                     continue;
