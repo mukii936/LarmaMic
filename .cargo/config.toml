@@ -1,0 +1,4 @@
+# Nhúng thư viện chạy C (VCRUNTIME140, UCRT) thẳng vào exe, để chạy được trên máy sạch
+# mà không cần cài "Visual C++ Redistributable".
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

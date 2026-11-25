@@ -1,0 +1,389 @@
+:root {
+  --bg: #0d1317;
+  --ink: #e8f0f3;
+  --mute: #8fa6b1;
+  --line: #2a3a44;
+  --sig: #38e0c8;
+  --warn: #ff6b6b;
+  --off: #17232a;
+  --ghost: #344b57;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 16px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) 0
+    max(16px, env(safe-area-inset-left));
+}
+main {
+  max-width: 520px;
+  margin: 0 auto;
+}
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+:focus-visible {
+  outline: 2px solid var(--sig);
+  outline-offset: 3px;
+}
+
+header {
+  padding: 4px 0 8px;
+}
+.app {
+  margin: 0;
+  color: var(--mute);
+  font-size: 14px;
+}
+h1 {
+  margin: 2px 0 0;
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+main[data-s='live'] h1 {
+  color: var(--sig);
+}
+main[data-s='error'] h1,
+main[data-s='retry'] h1 {
+  color: var(--warn);
+}
+.sub {
+  margin: 6px 0 0;
+  color: var(--mute);
+  font-size: 15px;
+  min-height: 44px;
+}
+.hint {
+  color: var(--mute);
+  font-size: 14px;
+  margin: 8px 0 0;
+}
+
+/* đồng hồ */
+.meter canvas {
+  display: block;
+  width: 100%;
+  height: 112px;
+  touch-action: pan-y;
+}
+.read {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+.read b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* cấu hình nhanh */
+.presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+.presets button {
+  height: 44px;
+  padding: 0 4px;
+  white-space: nowrap;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: transparent;
+  font-weight: 600;
+  font-size: 14px;
+}
+.presets button[aria-pressed='true'] {
+  border-color: var(--sig);
+  color: var(--sig);
+  background: rgba(56, 224, 200, 0.12);
+}
+.presets .mute {
+  grid-column: 1 / -1;
+}
+.presets .mute[aria-pressed='true'] {
+  border-color: var(--warn);
+  color: var(--warn);
+  background: rgba(255, 107, 107, 0.12);
+}
+
+section {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+.lead {
+  margin: 2px 0 6px;
+  color: var(--mute);
+  font-size: 14px;
+  max-width: 46ch;
+}
+.h {
+  display: block;
+  color: var(--mute);
+  font-size: 13px;
+  max-width: 42ch;
+}
+
+/* công tắc */
+.sw {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  min-height: 52px;
+}
+.sw .t {
+  display: block;
+}
+.sw input {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 52px;
+  height: 32px;
+  margin: 0;
+  border: 0;
+  border-radius: 16px;
+  background: var(--ghost);
+  transition: background 0.15s;
+}
+.sw input::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+.sw input:checked {
+  background: var(--sig);
+}
+.sw input:checked::after {
+  transform: translateX(20px);
+}
+
+/* thanh trượt */
+.ctl {
+  padding: 10px 0;
+}
+.ctl .top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.ctl output {
+  font-variant-numeric: tabular-nums;
+  color: var(--sig);
+  font-weight: 600;
+}
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 34px;
+  margin: 2px 0 0;
+  background: transparent;
+}
+input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--ghost) var(--a, 0%),
+    var(--sig) var(--a, 0%),
+    var(--sig) var(--b, 50%),
+    var(--ghost) var(--b, 50%)
+  );
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 26px;
+  height: 26px;
+  margin-top: -11px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* độ trễ ước tính */
+.lat {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+.lat b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* hồ sơ riêng */
+.profiles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+.profiles .plabel {
+  width: 100%;
+  color: var(--mute);
+  font-size: 13px;
+}
+.profiles button {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: transparent;
+  font-weight: 600;
+  font-size: 14px;
+}
+.profiles button[aria-pressed='true'] {
+  border-color: var(--sig);
+  color: var(--sig);
+  background: rgba(56, 224, 200, 0.12);
+}
+
+/* nút giữ để nói */
+.talk {
+  width: 100%;
+  height: 76px;
+  margin-bottom: 10px;
+  border: 0;
+  border-radius: 18px;
+  font: 800 22px/1 inherit;
+  background: var(--off);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--line);
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.talk[data-on='true'] {
+  background: var(--sig);
+  color: #04201c;
+  box-shadow: none;
+}
+
+/* tự đặt ngưỡng */
+.calbtn {
+  width: 100%;
+  height: 44px;
+  margin: 4px 0 8px;
+  border-radius: 12px;
+  border: 1.5px solid var(--line);
+  background: transparent;
+  font-weight: 600;
+  font-size: 14px;
+}
+.cal {
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--off);
+  font-size: 14px;
+}
+.cal p {
+  margin: 0;
+}
+.cal .warn {
+  color: var(--warn);
+}
+.calbar {
+  margin-top: 8px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ghost);
+  overflow: hidden;
+}
+.calbar div {
+  height: 100%;
+  background: var(--sig);
+}
+
+/* nút bật/dừng dính đáy màn hình */
+footer {
+  position: sticky;
+  bottom: 0;
+  margin: 24px -16px 0;
+  padding: 12px 16px max(16px, env(safe-area-inset-bottom));
+  background: linear-gradient(to bottom, rgba(13, 19, 23, 0), var(--bg) 30%);
+}
+.go {
+  width: 100%;
+  height: 60px;
+  border: 0;
+  border-radius: 16px;
+  font: 700 20px/1 inherit;
+  background: var(--sig);
+  color: #04201c;
+}
+main[data-s='live'] .go,
+main[data-s='retry'] .go,
+main[data-s='connecting'] .go {
+  background: #2a1517;
+  color: var(--warn);
+  box-shadow: inset 0 0 0 1.5px var(--warn);
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+/* language picker */
+header .top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.lang select {
+  max-width: 190px;
+  background: var(--off);
+  color: var(--ink);
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
