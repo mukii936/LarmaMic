@@ -127,6 +127,9 @@ fn make_tray() -> Option<TrayIds> {
     });
     // Đổi ngôn ngữ trong app thì đổi luôn chữ trên menu khay (chạy trên luồng chính, nơi giữ các mục menu)
     win::set_relabel_handler(move || {
+        if std::env::var_os("LARMA_DEBUG").is_some() {
+            win::log_line(&format!("tray menu relabeled: {} -> {}", i18n::current().code(), i18n::t("tray.quit")));
+        }
         open.set_text(i18n::t("tray.open"));
         mute.set_text(i18n::t("tray.mute"));
         unmute.set_text(i18n::t("tray.unmute"));

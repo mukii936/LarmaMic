@@ -1,0 +1,76 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build the phone page
+        working-directory: web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Test
+        run: cargo test --release
+
+      - name: Build the exe
+        run: cargo build --release
+
+      - name: Checksum
+        shell: pwsh
+        run: |
+          Copy-Item target/release/larma-mic.exe larma-mic.exe
+          (Get-FileHash larma-mic.exe -Algorithm SHA256).Hash.ToLower() + "  larma-mic.exe" | Set-Content SHA256.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: larma-mic-windows
+          path: |
+            larma-mic.exe
+            SHA256.txt
+
+  release:
+    # Only for version tags (v0.3.1 ...): attach the exe to the GitHub release, creating it if needed
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: larma-mic-windows
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" larma-mic.exe SHA256.txt --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" larma-mic.exe SHA256.txt --repo "$GITHUB_REPOSITORY" \
+              --title "LarmaMic ${TAG#v}" --generate-notes
+          fi

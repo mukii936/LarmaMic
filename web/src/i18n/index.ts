@@ -120,3 +120,15 @@ export function t(key: Key, ...args: (string | number)[]): string {
   });
   return s;
 }
+
+/** Tên trình duyệt đang dùng, để hướng dẫn nhắc đúng tên (Safari trên iPhone, Chrome trên Android...). */
+export function browserName(): string {
+  const ua = navigator.userAgent;
+  if (/FxiOS|Firefox/.test(ua)) return 'Firefox';
+  if (/EdgiOS|EdgA|Edg\//.test(ua)) return 'Edge';
+  if (/CriOS|Chrome/.test(ua)) return 'Chrome';
+  return 'Safari';
+}
+
+/** iPhone/iPad: chỉ ở đó mới có đường dẫn "Cài đặt > Safari > Micro". */
+export const isIos = /iPhone|iPad|iPod/.test(navigator.userAgent);

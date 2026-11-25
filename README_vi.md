@@ -14,7 +14,8 @@
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react&logoColor=black">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat&logo=windows&logoColor=white">
   <img alt="Languages" src="https://img.shields.io/badge/languages-10-38e0c8?style=flat">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-946ce6?style=flat">
+  <a href="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml"><img alt="Build" src="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml/badge.svg"></a>
+  <img alt="Version" src="https://img.shields.io/badge/version-0.3.1-946ce6?style=flat">
 
   <br><br>
 
@@ -36,6 +37,7 @@
 - Tắt/bật tiếng bằng phím tắt toàn cục (mặc định `Ctrl + Alt + M`, dùng được trong game) hoặc nút giữ để nói trên điện thoại, có tiếng bíp báo.
 - Xuất âm thanh qua VB-Cable hoặc Steam Streaming Microphone để dùng trong Discord, OBS, game, cuộc gọi và app ghi âm.
 - Ghi giọng đã lọc ra file WAV chỉ bằng một cú bấm.
+- Thêm trang vào Màn hình chính (iPhone: Chia sẻ > Thêm vào MH chính; Android: menu trình duyệt > Cài đặt ứng dụng). Bấm biểu tượng là mở toàn màn hình và đã ghép nối sẵn, không phải quét lại QR cho tới khi bạn đổi mã ghép nối.
 - Tắt màn hình vẫn chạy tiếp: khi iOS tạm dừng trang, mic và kết nối tự bật lại ngay khi bạn quay về.
 - 10 ngôn ngữ giao diện cho cả app PC và trang điện thoại, tự nhận theo máy.
 - An toàn: HTTPS với chứng chỉ tự ký, mã ghép nối ngẫu nhiên trong địa chỉ QR, mỗi lần một điện thoại, cài đặt ghi qua file tạm và giữ bản sao lưu `.bak`.
@@ -109,7 +111,8 @@ Riêng trang điện thoại: chạy `npm run dev` trong `web/` để xem giao d
 ## Kế hoạch
 
 - Ký số cho file exe
-- Chưa hỗ trợ Android và nền tảng khác; trang điện thoại có thể chạy ở trình duyệt di động khác nhưng mới thử trên Safari của iPhone
+- Android (Chrome) về lý thuyết chạy được vì phía điện thoại là trang web, nhưng chưa thử trên máy thật; mới thử trên Safari của iPhone
+- Máy tính khác Windows (macOS, Linux)
 
 ## Đóng góp
 

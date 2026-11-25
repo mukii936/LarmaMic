@@ -9,7 +9,7 @@ import {
   type NumKey,
   type Params,
 } from './types';
-import { adoptPcLang, type Key } from './i18n';
+import { adoptPcLang, isIos, type Key } from './i18n';
 
 export type Status = 'idle' | 'connecting' | 'live' | 'retry' | 'error';
 
@@ -25,7 +25,15 @@ interface TapMessage {
 }
 
 /** Mã ghép nối lấy từ địa chỉ trong mã QR (?k=...). */
-const TOKEN = new URLSearchParams(location.search).get('k') ?? '';
+export const TOKEN = (() => {
+  const fromUrl = new URLSearchParams(location.search).get('k');
+  try {
+    if (fromUrl) localStorage.setItem('larma-k', fromUrl);
+    return fromUrl ?? localStorage.getItem('larma-k') ?? '';
+  } catch {
+    return fromUrl ?? '';
+  }
+})();
 
 type ServerMessage =
   | { t: 'ready' }
@@ -220,7 +228,7 @@ export function useMic() {
     setStatus('error');
     setMessage(
       e.name === 'NotAllowedError' || e.name === 'SecurityError'
-        ? { k: 'err.mic' }
+        ? { k: isIos ? 'err.mic' : 'err.mic.generic' }
         : { k: 'err.open', a: [e.message ?? ''] },
     );
   }, []);

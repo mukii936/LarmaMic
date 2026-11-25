@@ -1,7 +1,7 @@
 import { Controls } from './Controls';
 import { Meter } from './Meter';
 import { useMic, type Status } from './useMic';
-import { chosen, LANGS, NAMES, setLang, t, useLang, type Key, type Lang } from './i18n';
+import { browserName, chosen, LANGS, NAMES, setLang, t, useLang, type Key, type Lang } from './i18n';
 
 const TITLE: Record<Status, Key> = {
   idle: 'title.idle',
@@ -59,7 +59,7 @@ export function App() {
         </div>
         <h1>{t(TITLE[status])}</h1>
         <p className="sub" role="status">
-          {message ? t(message.k, ...(message.a ?? [])) : SUB[status] ? t(SUB[status]) : ''}
+          {message ? t(message.k, ...(message.a ?? [])) : SUB[status] ? t(SUB[status], browserName()) : ''}
         </p>
       </header>
 

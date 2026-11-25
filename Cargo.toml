@@ -1,6 +1,6 @@
 [package]
 name = "larma-mic"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 description = "Dùng iPhone làm mic cho PC: nhận âm thanh qua Wi-Fi, lọc ồn RNNoise, xuất ra mic ảo (VB-Cable)"
 

@@ -32,9 +32,10 @@ const GHOST: Color32 = Color32::from_rgb(0x34, 0x4b, 0x57);
 const ON_SIG: Color32 = Color32::from_rgb(0x04, 0x20, 0x1c);
 
 /// Nạp font: Segoe UI làm chính (có đủ Latin, dấu tiếng Việt, Cyrillic). Riêng tiếng Trung/Nhật/Hàn thì
-/// nạp thêm một font hệ thống của Windows làm phương án dự phòng, và CHỈ khi đang dùng ngôn ngữ đó
-/// (các file này nặng hàng chục MB nên không nạp sẵn cho mọi người).
-pub fn apply_fonts(ctx: &egui::Context, lang: Lang) {
+/// nạp thêm một font hệ thống của Windows, và CHỈ khi đang dùng ngôn ngữ đó (các file này nặng hàng chục
+/// MB nên không nạp sẵn cho mọi người). `menu` = đang mở ô chọn ngôn ngữ: nạp tạm cả ba font ở cuối danh
+/// sách để tên 中文 / 日本語 / 한국어 hiện đúng, đóng ô chọn thì nạp lại như cũ.
+pub fn apply_fonts(ctx: &egui::Context, lang: Lang, menu: bool) {
     let mut fonts = FontDefinitions::default();
     if let Ok(bytes) = std::fs::read("C:\\Windows\\Fonts\\segoeui.ttf") {
         fonts.font_data.insert("segoe".into(), Arc::new(FontData::from_owned(bytes)));
@@ -42,27 +43,37 @@ pub fn apply_fonts(ctx: &egui::Context, lang: Lang) {
             f.insert(0, "segoe".into());
         }
     }
-    let fallbacks: &[&str] = match lang {
-        Lang::Zh => &["msyh.ttc", "msyh.ttf", "simsun.ttc"],
-        Lang::Ja => &["YuGothR.ttc", "YuGothM.ttc", "meiryo.ttc", "msgothic.ttc"],
-        Lang::Ko => &["malgun.ttf", "gulim.ttc"],
-        _ => &[],
-    };
-    for file in fallbacks {
-        if let Ok(bytes) = std::fs::read(format!("C:\\Windows\\Fonts\\{file}")) {
-            fonts.font_data.insert("cjk".into(), Arc::new(FontData::from_owned(bytes)));
-            if let Some(f) = fonts.families.get_mut(&FontFamily::Proportional) {
-                // đứng đầu: cả chữ Latin lẫn CJK trong cùng một dòng dùng chung một font nên không bị lệch dòng
-                f.insert(0, "cjk".into());
+    let groups: [(Lang, &[&str]); 3] = [
+        (Lang::Zh, &["msyh.ttc", "msyh.ttf", "simsun.ttc"]),
+        (Lang::Ja, &["YuGothR.ttc", "YuGothM.ttc", "meiryo.ttc", "msgothic.ttc"]),
+        (Lang::Ko, &["malgun.ttf", "gulim.ttc"]),
+    ];
+    for (g, files) in groups {
+        let primary = g == lang;
+        if !primary && !menu {
+            continue;
+        }
+        for file in files {
+            if let Ok(bytes) = std::fs::read(format!("C:\\Windows\\Fonts\\{file}")) {
+                let name = format!("cjk-{}", g.code());
+                fonts.font_data.insert(name.clone(), Arc::new(FontData::from_owned(bytes)));
+                if let Some(f) = fonts.families.get_mut(&FontFamily::Proportional) {
+                    if primary {
+                        // đứng đầu: chữ Latin và CJK trong cùng một dòng dùng chung font nên không bị lệch dòng
+                        f.insert(0, name);
+                    } else {
+                        f.push(name);
+                    }
+                }
+                break;
             }
-            break;
         }
     }
     ctx.set_fonts(fonts);
 }
 
 pub fn setup(ctx: &egui::Context) {
-    apply_fonts(ctx, i18n::current());
+    apply_fonts(ctx, i18n::current(), false);
 
     let r = CornerRadius::same(10);
     let mut v = egui::Visuals::dark();
@@ -152,6 +163,8 @@ pub struct App {
     no_beep: bool,
     /// "auto" hoặc mã ngôn ngữ ("vi", "en", ...).
     lang_pref: String,
+    /// Ô chọn ngôn ngữ đang mở: đã nạp tạm font CJK để hiện tên các ngôn ngữ.
+    menu_fonts: bool,
 }
 
 /// Các phím tắt cho người dùng chọn: (chuỗi đăng ký, tên hiển thị). "off" được dịch riêng.
@@ -219,6 +232,7 @@ impl App {
             hotkey,
             no_beep,
             lang_pref,
+            menu_fonts: false,
             sh,
             tx,
             devices,
@@ -306,8 +320,9 @@ impl App {
             None => t("lang.auto.short"),
         };
         let mut chosen: Option<String> = None;
-        egui::ComboBox::from_id_salt("lang")
+        let resp = egui::ComboBox::from_id_salt("lang")
             .width(130.0)
+            .height(520.0)
             .selected_text(shown)
             .show_ui(ui, |ui| {
                 if ui.selectable_label(Lang::from_code(&self.lang_pref).is_none(), t("lang.auto")).clicked() {
@@ -319,6 +334,12 @@ impl App {
                     }
                 }
             });
+        let open = resp.inner.is_some();
+        if open != self.menu_fonts {
+            self.menu_fonts = open;
+            apply_fonts(ui.ctx(), i18n::current(), open);
+            ui.ctx().request_repaint();
+        }
         if let Some(c) = chosen {
             self.set_language(ui.ctx(), &c);
         }
@@ -328,7 +349,8 @@ impl App {
         self.lang_pref = pref.to_string();
         let l = i18n::resolve(pref);
         i18n::set(l);
-        apply_fonts(ctx, l);
+        apply_fonts(ctx, l, false);
+        self.menu_fonts = false;
         crate::win::relabel_tray();
         self.sh.params_ver.fetch_add(1, Relaxed); // để trang iPhone nhận ngôn ngữ mới
         self.persist(true);

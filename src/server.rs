@@ -37,6 +37,39 @@ const PHONE_JS: &str = include_str!("../web/dist/assets/app.js");
 const PHONE_CSS: &str = include_str!("../web/dist/assets/app.css");
 const PHONE_WORKLET: &str = include_str!("../web/dist/phone-worklet.js");
 
+const ICON_180: &[u8] = include_bytes!("../web/dist/icon-180.png");
+const ICON_192: &[u8] = include_bytes!("../web/dist/icon-192.png");
+const ICON_512: &[u8] = include_bytes!("../web/dist/icon-512.png");
+
+fn png(body: &'static [u8]) -> Response {
+    ([(header::CONTENT_TYPE, "image/png"), (header::CACHE_CONTROL, "public, max-age=86400")], body).into_response()
+}
+
+/// Manifest để "Thêm vào Màn hình chính" (iOS/Android): start_url mang sẵn mã ghép nối, nên mở từ biểu tượng
+/// là nối được luôn, không phải quét lại QR. Chỉ trả khi mã đúng; đổi mã ở PC thì lối tắt cũ hết hiệu lực.
+async fn manifest_route(State(sh): State<Arc<Shared>>, Query(q): Query<HashMap<String, String>>) -> Response {
+    let Some(k) = q.get("k").filter(|k| ct_eq(k, &sh.token.read())) else {
+        return axum::http::StatusCode::FORBIDDEN.into_response();
+    };
+    let body = json!({
+        "name": "LarmaMic",
+        "short_name": "LarmaMic",
+        "description": t("app.tagline"),
+        "start_url": format!("/?k={}", k),
+        "scope": "/",
+        "display": "standalone",
+        "orientation": "portrait",
+        "background_color": "#0d1317",
+        "theme_color": "#0d1317",
+        "icons": [
+            { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+            { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+        ]
+    })
+    .to_string();
+    ([(header::CONTENT_TYPE, "application/manifest+json"), (header::CACHE_CONTROL, "no-store")], body).into_response()
+}
+
 fn page(body: &'static str, kind: &'static str) -> Response {
     ([(header::CONTENT_TYPE, kind), (header::CACHE_CONTROL, "no-store")], body).into_response()
 }
@@ -275,6 +308,10 @@ async fn run(sh: Arc<Shared>) -> Result<(), String> {
         .route("/assets/app.js", get(|| async { page(PHONE_JS, "application/javascript") }))
         .route("/assets/app.css", get(|| async { page(PHONE_CSS, "text/css; charset=utf-8") }))
         .route("/phone-worklet.js", get(|| async { page(PHONE_WORKLET, "application/javascript") }))
+        .route("/icon-180.png", get(|| async { png(ICON_180) }))
+        .route("/icon-192.png", get(|| async { png(ICON_192) }))
+        .route("/icon-512.png", get(|| async { png(ICON_512) }))
+        .route("/manifest.webmanifest", get(manifest_route))
         .route("/ws", get(ws_route))
         .with_state(sh.clone());
 

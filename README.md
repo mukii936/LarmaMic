@@ -14,7 +14,8 @@
   <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react&logoColor=black">
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat&logo=windows&logoColor=white">
   <img alt="Languages" src="https://img.shields.io/badge/languages-10-38e0c8?style=flat">
-  <img alt="Version" src="https://img.shields.io/badge/version-0.3.0-946ce6?style=flat">
+  <a href="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml"><img alt="Build" src="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml/badge.svg"></a>
+  <img alt="Version" src="https://img.shields.io/badge/version-0.3.1-946ce6?style=flat">
 
   <br><br>
 
@@ -36,6 +37,7 @@
 - Mute with a global hotkey (default `Ctrl + Alt + M`, works in games) or a push-to-talk button on the phone, with a beep to confirm.
 - Route audio through VB-Cable or Steam Streaming Microphone on Windows to use it in Discord, OBS, games, calls and recording apps.
 - Record the filtered voice to a WAV file in one click.
+- Add the page to the Home Screen (iPhone: Share > Add to Home Screen; Android: browser menu > Install app). The icon opens it full screen and already paired, so there is no need to scan the QR code again until you change the pairing code.
 - Keep working with the screen off: when iOS pauses the page, the mic and connection resume as soon as you return.
 - Use 10 interface languages on both the PC app and the phone page, with automatic detection.
 - Stay safe: HTTPS with a self-signed certificate, a random pairing code in the QR address, one phone at a time, and settings written through a temporary file with a `.bak` backup.
@@ -109,7 +111,8 @@ For the phone page alone, run `npm run dev` inside `web/` to preview the UI with
 ## Roadmap
 
 - Code signing for the exe
-- Android and other platforms are not supported yet; the phone page may already work in other mobile browsers, but only iPhone Safari has been tested
+- Android (Chrome) should work because the phone side is a web page, but it has not been tested on a real device; only iPhone Safari has been tested
+- Other desktop platforms (macOS, Linux)
 
 ## Contributing
 
