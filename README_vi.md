@@ -37,6 +37,7 @@
 - Tắt/bật tiếng bằng phím tắt toàn cục (mặc định `Ctrl + Alt + M`, dùng được trong game) hoặc nút giữ để nói trên điện thoại, có tiếng bíp báo.
 - Xuất âm thanh qua VB-Cable hoặc Steam Streaming Microphone để dùng trong Discord, OBS, game, cuộc gọi và app ghi âm.
 - Ghi giọng đã lọc ra file WAV chỉ bằng một cú bấm.
+- Tiết kiệm pin: trang điện thoại có nút Tiết kiệm pin, đưa cả màn hình thành màu đen trong khi mic vẫn truyền; nhấp đúp ở đâu cũng được để hiện lại giao diện.
 - Thêm trang vào Màn hình chính (iPhone: Chia sẻ > Thêm vào MH chính; Android: menu trình duyệt > Cài đặt ứng dụng). Bấm biểu tượng là mở toàn màn hình và đã ghép nối sẵn, không phải quét lại QR cho tới khi bạn đổi mã ghép nối.
 - Tắt màn hình vẫn chạy tiếp: khi iOS tạm dừng trang, mic và kết nối tự bật lại ngay khi bạn quay về.
 - 10 ngôn ngữ giao diện cho cả app PC và trang điện thoại, tự nhận theo máy.

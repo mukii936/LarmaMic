@@ -13,6 +13,8 @@ export const en = {
   'talk.off': 'Hold to talk',
   'go.start': 'Start mic',
   'go.stop': 'Stop',
+  'saver.btn': 'Battery saver',
+  'saver.hint': 'Double-tap to show the controls',
   'preset.voice': 'Voice',
   'preset.game': 'Game',
   'preset.podcast': 'Podcast',

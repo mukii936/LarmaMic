@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Controls } from './Controls';
 import { Meter } from './Meter';
 import { useMic, type Status } from './useMic';
@@ -41,14 +42,62 @@ function LanguagePicker() {
   );
 }
 
+/**
+ * Chế độ tiết kiệm pin: cả màn hình đen hẳn (màn OLED tắt điểm ảnh nên đỡ tốn pin), mic vẫn truyền bình thường.
+ * Nhấp đúp ở bất kỳ đâu để hiện lại. Dòng gợi ý chỉ hiện mờ vài giây rồi tắt hẳn.
+ */
+function SaverScreen({ onExit }: { onExit: () => void }) {
+  const last = useRef({ at: 0, x: 0, y: 0 });
+  const [hint, setHint] = useState(true);
+  useLang();
+
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    const old = meta?.getAttribute('content') ?? null;
+    meta?.setAttribute('content', '#000000');
+    const id = window.setTimeout(() => setHint(false), 3500);
+    return () => {
+      window.clearTimeout(id);
+      if (meta && old) meta.setAttribute('content', old);
+    };
+  }, []);
+
+  return (
+    <div
+      className="saver"
+      onPointerUp={(e) => {
+        const now = Date.now();
+        const p = last.current;
+        if (now - p.at < 400 && Math.hypot(e.clientX - p.x, e.clientY - p.y) < 60) {
+          last.current = { at: 0, x: 0, y: 0 };
+          onExit();
+        } else {
+          last.current = { at: now, x: e.clientX, y: e.clientY };
+        }
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      {hint && <p>{t('saver.hint')}</p>}
+    </div>
+  );
+}
+
 export function App() {
   const {
     status, message, params, preset, profiles, profile, ptt, meter,
     setParam, choosePreset, chooseProfile, calibrate, enablePtt, setMuteNow, start, stop,
   } = useMic();
   useLang();
+  const [saver, setSaver] = useState(false);
   const running = status !== 'idle' && status !== 'error';
   const talking = ptt && params ? !params.mute : false;
+
+  // Mất kết nối hẳn hoặc đã dừng thì thoát chế độ tiết kiệm để người dùng thấy chuyện gì xảy ra
+  useEffect(() => {
+    if (status === 'idle' || status === 'error') setSaver(false);
+  }, [status]);
+
+  if (saver) return <SaverScreen onExit={() => setSaver(false)} />;
 
   return (
     <main data-s={status}>
@@ -99,6 +148,11 @@ export function App() {
             onContextMenu={(e) => e.preventDefault()}
           >
             {t(talking ? 'talk.on' : 'talk.off')}
+          </button>
+        )}
+        {(running || import.meta.env.DEV) && !ptt && (
+          <button type="button" className="saverbtn" onClick={() => setSaver(true)}>
+            {t('saver.btn')}
           </button>
         )}
         <button type="button" className="go" onClick={running ? stop : start}>

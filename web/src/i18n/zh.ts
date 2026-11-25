@@ -15,6 +15,8 @@ export const zh: Dict = {
   'talk.off': '按住说话',
   'go.start': '开启麦克风',
   'go.stop': '停止',
+  'saver.btn': '省电模式',
+  'saver.hint': '双击显示界面',
   'preset.voice': '语音',
   'preset.game': '游戏',
   'preset.podcast': '播客',

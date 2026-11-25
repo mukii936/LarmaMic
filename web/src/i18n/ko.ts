@@ -15,6 +15,8 @@ export const ko: Dict = {
   'talk.off': '눌러서 말하기',
   'go.start': '마이크 켜기',
   'go.stop': '중지',
+  'saver.btn': '절전 모드',
+  'saver.hint': '두 번 탭하면 다시 표시',
   'preset.voice': '음성',
   'preset.game': '게임',
   'preset.podcast': '팟캐스트',

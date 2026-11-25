@@ -15,6 +15,8 @@ export const de: Dict = {
   'talk.off': 'Zum Sprechen halten',
   'go.start': 'Mikrofon starten',
   'go.stop': 'Stopp',
+  'saver.btn': 'Akku sparen',
+  'saver.hint': 'Zum Anzeigen doppelt tippen',
   'preset.voice': 'Stimme',
   'preset.game': 'Spiel',
   'preset.podcast': 'Podcast',

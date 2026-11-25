@@ -15,6 +15,8 @@ export const ru: Dict = {
   'talk.off': 'Удерживайте, чтобы говорить',
   'go.start': 'Включить микрофон',
   'go.stop': 'Стоп',
+  'saver.btn': 'Экономия заряда',
+  'saver.hint': 'Дважды коснитесь, чтобы показать',
   'preset.voice': 'Голос',
   'preset.game': 'Игра',
   'preset.podcast': 'Подкаст',

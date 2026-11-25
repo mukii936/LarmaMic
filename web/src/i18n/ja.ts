@@ -15,6 +15,8 @@ export const ja: Dict = {
   'talk.off': '押して話す',
   'go.start': 'マイクを開始',
   'go.stop': '停止',
+  'saver.btn': 'バッテリーセーバー',
+  'saver.hint': 'ダブルタップで表示',
   'preset.voice': 'ボイス',
   'preset.game': 'ゲーム',
   'preset.podcast': 'ポッドキャスト',

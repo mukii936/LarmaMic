@@ -15,6 +15,8 @@ export const vi: Dict = {
   'talk.off': 'Giữ để nói',
   'go.start': 'Bật mic',
   'go.stop': 'Dừng',
+  'saver.btn': 'Tiết kiệm pin',
+  'saver.hint': 'Nhấp đúp để hiện lại giao diện',
   'preset.voice': 'Giọng nói',
   'preset.game': 'Game',
   'preset.podcast': 'Podcast',

@@ -37,6 +37,7 @@
 - Mute with a global hotkey (default `Ctrl + Alt + M`, works in games) or a push-to-talk button on the phone, with a beep to confirm.
 - Route audio through VB-Cable or Steam Streaming Microphone on Windows to use it in Discord, OBS, games, calls and recording apps.
 - Record the filtered voice to a WAV file in one click.
+- Save battery: the phone page has a Battery saver button that turns the whole screen black while the mic keeps streaming; double-tap anywhere to bring the controls back.
 - Add the page to the Home Screen (iPhone: Share > Add to Home Screen; Android: browser menu > Install app). The icon opens it full screen and already paired, so there is no need to scan the QR code again until you change the pairing code.
 - Keep working with the screen off: when iOS pauses the page, the mic and connection resume as soon as you return.
 - Use 10 interface languages on both the PC app and the phone page, with automatic detection.

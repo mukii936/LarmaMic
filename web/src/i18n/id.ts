@@ -15,6 +15,8 @@ export const id: Dict = {
   'talk.off': 'Tahan untuk bicara',
   'go.start': 'Mulai mikrofon',
   'go.stop': 'Berhenti',
+  'saver.btn': 'Hemat baterai',
+  'saver.hint': 'Ketuk dua kali untuk menampilkan',
   'preset.voice': 'Suara',
   'preset.game': 'Game',
   'preset.podcast': 'Podcast',
