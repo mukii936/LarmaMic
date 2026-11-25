@@ -120,3 +120,7 @@ Bug reports, translation fixes and pull requests are welcome. Please open an iss
 Special thanks to [MicYou](https://github.com/MicYou-Dev/MicYou) for the inspiration, including the idea of using Steam Streaming Microphone as a ready-made virtual microphone on Windows.
 
 Special thanks to [Jean-Marc Valin](https://github.com/xiph/rnnoise) for RNNoise, [nnnoiseless](https://github.com/jneem/nnnoiseless) for its Rust port, and [VB-Audio](https://vb-audio.com/Cable/) for VB-Cable.
+
+## License
+
+This project is licensed under the [MIT License](./LICENSE).

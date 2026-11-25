@@ -120,3 +120,7 @@ Báo lỗi, sửa bản dịch và pull request đều được chào đón. V�
 Cảm ơn [MicYou](https://github.com/MicYou-Dev/MicYou) đã truyền cảm hứng, trong đó có ý tưởng dùng Steam Streaming Microphone làm mic ảo dựng sẵn trên Windows.
 
 Cảm ơn [Jean-Marc Valin](https://github.com/xiph/rnnoise) với RNNoise, [nnnoiseless](https://github.com/jneem/nnnoiseless) với bản Rust, và [VB-Audio](https://vb-audio.com/Cable/) với VB-Cable.
+
+## Giấy phép
+
+Dự án dùng [giấy phép MIT](./LICENSE).
