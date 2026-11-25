@@ -141,6 +141,8 @@ pub struct Saved {
     pub profiles: Vec<Profile>,
     /// Ngôn ngữ giao diện: "vi", "en"... Rỗng = tự theo ngôn ngữ của Windows.
     pub lang: String,
+    /// Cách điện thoại nối tới PC: "wifi" (mặc định), "usb" hoặc "bt". Quyết định địa chỉ nào đứng đầu trong QR.
+    pub conn_mode: String,
     /// Khóa dịch của ghi chú về lần đọc cài đặt này (không lưu ra file), ví dụ "note.backup".
     #[serde(skip)]
     pub note: String,

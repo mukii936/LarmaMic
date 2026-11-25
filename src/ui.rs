@@ -163,6 +163,8 @@ pub struct App {
     no_beep: bool,
     /// "auto" hoặc mã ngôn ngữ ("vi", "en", ...).
     lang_pref: String,
+    /// "wifi" | "usb" | "bt": đổi địa chỉ đứng đầu trong QR và hướng dẫn hiện ra.
+    conn_mode: String,
     /// Ô chọn ngôn ngữ đang mở: đã nạp tạm font CJK để hiện tên các ngôn ngữ.
     menu_fonts: bool,
 }
@@ -224,6 +226,7 @@ impl App {
         let hk_mgr = GlobalHotKeyManager::new().ok();
         let (hk, hk_err) = register_hotkey(&hk_mgr, &hotkey);
         let no_beep = saved.no_beep;
+        let conn_mode = if saved.conn_mode == "usb" || saved.conn_mode == "bt" { saved.conn_mode.clone() } else { "wifi".to_string() };
         let lang_pref = if Lang::from_code(&saved.lang).is_some() { saved.lang.clone() } else { "auto".to_string() };
         Self {
             hk_mgr,
@@ -232,6 +235,7 @@ impl App {
             hotkey,
             no_beep,
             lang_pref,
+            conn_mode,
             menu_fonts: false,
             sh,
             tx,
@@ -294,6 +298,7 @@ impl App {
             token: self.sh.token.read().clone(),
             hotkey: self.hotkey.clone(),
             no_beep: self.no_beep,
+            conn_mode: self.conn_mode.clone(),
             lang: if Lang::from_code(&self.lang_pref).is_some() { self.lang_pref.clone() } else { String::new() },
             profiles: self.sh.profiles.read().clone(),
             note: String::new(),
@@ -383,14 +388,44 @@ impl App {
 
         let base = self.sh.url.lock().clone();
         ui.add_space(8.0);
+        // Cách điện thoại nối tới PC: Wi-Fi, cáp USB (chia sẻ mạng USB) hoặc Bluetooth (chia sẻ mạng Bluetooth)
+        ui.horizontal(|ui| {
+            for (m, label) in [("wifi", "Wi-Fi".to_string()), ("usb", t("mode.usb")), ("bt", "Bluetooth".to_string())] {
+                if ui.selectable_label(self.conn_mode == m, label).clicked() && self.conn_mode != m {
+                    self.conn_mode = m.to_string();
+                    self.persist(true);
+                }
+            }
+        });
+        let hint_key = match self.conn_mode.as_str() {
+            "usb" => "mode.usb.hint",
+            "bt" => "mode.bt.hint",
+            _ => "mode.wifi.hint",
+        };
+        ui.label(RichText::new(t(hint_key)).small().color(MUTE));
+        ui.add_space(6.0);
         if base.is_empty() {
             ui.label(RichText::new(t("srv.starting")).color(MUTE));
         } else {
             // Mã ghép nối nằm trong địa chỉ (và QR): không có mã đúng thì điện thoại không gửi được tiếng vào PC
             let token = self.sh.token.read().clone();
             let alt = self.sh.alt_hosts.lock().clone();
-            // "h" lists the PC's other addresses; the phone tries them in turn (USB / Bluetooth tethering, hotspot)
-            let url = if alt.is_empty() { format!("{base}/?k={token}") } else { format!("{base}/?k={token}&h={}", alt.join(",")) };
+            // Ở chế độ USB/Bluetooth, địa chỉ của card mạng chia sẻ đứng đầu trong QR (trang web trên iPhone chỉ dùng địa chỉ đầu);
+            // "h" liệt kê các địa chỉ còn lại để app Android thử lần lượt
+            let (primary, port) = base.trim_start_matches("https://").split_once(':').map(|(a, b)| (a.to_string(), b.to_string())).unwrap_or_default();
+            let tether = self.conn_mode != "wifi";
+            let (host, others): (String, Vec<String>) = if tether && !alt.is_empty() {
+                let mut o: Vec<String> = alt[1..].to_vec();
+                o.push(primary.clone());
+                (alt[0].clone(), o)
+            } else {
+                (primary.clone(), alt.clone())
+            };
+            let base = format!("https://{host}:{port}");
+            if tether && alt.is_empty() {
+                ui.colored_label(WARN, t("mode.none"));
+            }
+            let url = if others.is_empty() { format!("{base}/?k={token}") } else { format!("{base}/?k={token}&h={}", others.join(",")) };
             self.draw_qr(ui, &url);
             ui.add_space(4.0);
             ui.label(RichText::new(t("pair.scan")).size(14.0).color(MUTE));
@@ -411,7 +446,7 @@ impl App {
                 }
             });
             ui.add_space(2.0);
-            if !alt.is_empty() {
+            if !alt.is_empty() && !tether {
                 ui.label(RichText::new(tf("pair.alt", &[&alt.join(", ")])).small().color(SIG));
             }
             ui.label(RichText::new(t("pair.cert")).small().color(MUTE));
