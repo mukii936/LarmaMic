@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -120,7 +121,8 @@ fun LarmaApp(
             return@MaterialTheme
         }
 
-        Box(Modifier.fillMaxSize().background(Bg)) {
+        // Surface gives every Text the right default colour (otherwise labels without an explicit colour look dim)
+        Surface(Modifier.fillMaxSize(), color = Bg, contentColor = Ink) {
             Column(
                 Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),
             ) {
@@ -407,7 +409,10 @@ private fun SwitchRow(label: String, hint: String?, checked: Boolean, onChange: 
         }
         Switch(
             checked = checked, onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(checkedTrackColor = Sig, checkedThumbColor = Color(0xFF04201B), uncheckedTrackColor = Ghost),
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = Sig, checkedThumbColor = Color(0xFF04201B), checkedBorderColor = Sig,
+                uncheckedTrackColor = Off, uncheckedThumbColor = Mute, uncheckedBorderColor = Ghost,
+            ),
         )
     }
 }
