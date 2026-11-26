@@ -84,7 +84,8 @@ class MainActivity : AppCompatActivity() {
             val scan = {
                 scanner.launch(
                     ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false)
-                        .setOrientationLocked(false).setPrompt(getString(R.string.scan_prompt)),
+                        .setOrientationLocked(false).setCaptureActivity(PortraitCaptureActivity::class.java)
+                        .setPrompt(getString(R.string.scan_prompt)),
                 )
             }
 
