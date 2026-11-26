@@ -60,6 +60,8 @@ export const fr: Dict = {
   'ctl.depth.hint': 'plus haut = fond plus silencieux',
   'ctl.hp': 'Filtre anti-grondement',
   'ctl.hp.hint': 'supprime le vent, les chocs sur le bureau et le ronflement du secteur',
+  'ctl.aec': 'Annulation d’écho',
+  'ctl.aec.hint': 'Retire du micro ce que le PC diffuse (l’interlocuteur) pour qu’il ne s’entende pas. Nécessite les haut-parleurs ou le casque du PC comme sortie par défaut.',
   'sec.eq': 'Tonalité',
   'sec.eq.lead': 'Chaque curseur va de −12 à +12 dB.',
   'ctl.low': 'Graves',

@@ -60,6 +60,8 @@
     <string name="ctl_depth_hint">大きいほど背景が静かになります</string>
     <string name="ctl_hp">ランブルフィルター</string>
     <string name="ctl_hp_hint">風切り音、机の振動、電源ハムを除去します</string>
+    <string name="ctl_aec">エコーキャンセル</string>
+    <string name="ctl_aec_hint">PC が再生している音（通話相手の声）をマイクから取り除き、相手に自分の声が戻らないようにします。PC のスピーカーまたはヘッドホンが既定の出力である必要があります。</string>
     <string name="sec_eq">音質</string>
     <string name="sec_eq_lead">各スライダーの範囲は −12 〜 +12 dB です。</string>
     <string name="ctl_low">低音</string>

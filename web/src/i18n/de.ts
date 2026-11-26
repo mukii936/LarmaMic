@@ -60,6 +60,8 @@ export const de: Dict = {
   'ctl.depth.hint': 'höher = leiserer Hintergrund',
   'ctl.hp': 'Rumpelfilter',
   'ctl.hp.hint': 'entfernt Wind, Tischklopfen und Netzbrummen',
+  'ctl.aec': 'Echounterdrückung',
+  'ctl.aec.hint': 'Entfernt das, was der PC abspielt (die Gegenseite eines Anrufs), aus dem Mikrofon, damit sie sich nicht selbst hören. Benötigt die PC-Lautsprecher oder Kopfhörer als Standardausgabe.',
   'sec.eq': 'Klang',
   'sec.eq.lead': 'Jeder Regler reicht von −12 bis +12 dB.',
   'ctl.low': 'Bass',

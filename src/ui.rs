@@ -922,6 +922,19 @@ fn section_noise(ui: &mut Ui, p: &mut Params, sh: &Shared, connected: bool) {
     calibrate_row(ui, sh, connected, p.thr);
     ctl(ui, &t("ctl.depth"), &t("ctl.depth.hint"), &mut p.depth, 6.0..=80.0, " dB");
     ctl(ui, &t("ctl.hp"), &t("ctl.hp.hint"), &mut p.hp, 40.0..=250.0, " Hz");
+    ui.add_space(6.0);
+    switch_row(ui, &t("ctl.aec"), &t("ctl.aec.hint"), &mut p.aec);
+    if p.aec {
+        match sh.aec_err.lock().clone() {
+            Some(e) if e == "virtual" => {
+                ui.colored_label(WARN, t("aec.err.virtual"));
+            }
+            Some(e) => {
+                ui.colored_label(WARN, tf("aec.err", &[&e]));
+            }
+            None => {}
+        }
+    }
 }
 
 fn section_eq(ui: &mut Ui, p: &mut Params) {

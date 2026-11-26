@@ -58,6 +58,8 @@ export const en = {
   'ctl.depth.hint': 'higher = quieter background',
   'ctl.hp': 'Rumble filter',
   'ctl.hp.hint': 'removes wind, desk thumps and mains hum',
+  'ctl.aec': 'Echo cancellation',
+  'ctl.aec.hint': 'Removes what the PC plays (the other side of a call) from the microphone, so they do not hear themselves. Needs the PC speakers or headphones as the default output.',
   'sec.eq': 'Tone',
   'sec.eq.lead': 'Each slider ranges from −12 to +12 dB.',
   'ctl.low': 'Bass',

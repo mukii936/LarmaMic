@@ -60,6 +60,8 @@
     <string name="ctl_depth_hint">높을수록 배경이 더 조용해집니다</string>
     <string name="ctl_hp">럼블 필터</string>
     <string name="ctl_hp_hint">바람 소리, 책상 진동, 전원 험을 제거합니다</string>
+    <string name="ctl_aec">에코 제거</string>
+    <string name="ctl_aec_hint">PC가 재생하는 소리(통화 상대의 목소리)를 마이크에서 제거해 상대가 자기 목소리를 듣지 않게 합니다. PC 스피커나 헤드폰이 기본 출력이어야 합니다.</string>
     <string name="sec_eq">음색</string>
     <string name="sec_eq_lead">각 슬라이더의 범위는 −12 ~ +12 dB입니다.</string>
     <string name="ctl_low">저음</string>

@@ -60,6 +60,8 @@ export const es: Dict = {
   'ctl.depth.hint': 'más alto = fondo más silencioso',
   'ctl.hp': 'Filtro de graves',
   'ctl.hp.hint': 'elimina viento, golpes en la mesa y zumbido de la red eléctrica',
+  'ctl.aec': 'Cancelación de eco',
+  'ctl.aec.hint': 'Quita del micrófono lo que reproduce el PC (la otra persona de la llamada) para que no se oigan a sí mismos. Requiere los altavoces o auriculares del PC como salida predeterminada.',
   'sec.eq': 'Tono',
   'sec.eq.lead': 'Cada control va de −12 a +12 dB.',
   'ctl.low': 'Graves',

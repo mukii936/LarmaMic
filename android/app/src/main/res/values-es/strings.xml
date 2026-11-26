@@ -60,6 +60,8 @@
     <string name="ctl_depth_hint">más alto = fondo más silencioso</string>
     <string name="ctl_hp">Filtro de graves</string>
     <string name="ctl_hp_hint">elimina viento, golpes en la mesa y zumbido de la red eléctrica</string>
+    <string name="ctl_aec">Cancelación de eco</string>
+    <string name="ctl_aec_hint">Quita del micrófono lo que reproduce el PC (la otra persona de la llamada) para que no se oigan a sí mismos. Requiere los altavoces o auriculares del PC como salida predeterminada.</string>
     <string name="sec_eq">Tono</string>
     <string name="sec_eq_lead">Cada control va de −12 a +12 dB.</string>
     <string name="ctl_low">Graves</string>

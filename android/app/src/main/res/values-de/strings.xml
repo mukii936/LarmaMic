@@ -60,6 +60,8 @@
     <string name="ctl_depth_hint">höher = leiserer Hintergrund</string>
     <string name="ctl_hp">Rumpelfilter</string>
     <string name="ctl_hp_hint">entfernt Wind, Tischklopfen und Netzbrummen</string>
+    <string name="ctl_aec">Echounterdrückung</string>
+    <string name="ctl_aec_hint">Entfernt das, was der PC abspielt (die Gegenseite eines Anrufs), aus dem Mikrofon, damit sie sich nicht selbst hören. Benötigt die PC-Lautsprecher oder Kopfhörer als Standardausgabe.</string>
     <string name="sec_eq">Klang</string>
     <string name="sec_eq_lead">Jeder Regler reicht von −12 bis +12 dB.</string>
     <string name="ctl_low">Bass</string>

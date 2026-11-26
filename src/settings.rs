@@ -26,6 +26,7 @@ pub struct Params {
     pub mute: bool,
     pub monitor: bool,  // nghe thử trên loa/tai nghe mặc định
     pub agc: bool,      // tự cân âm lượng
+    pub aec: bool,      // khử vọng (echo): trừ đi âm thanh PC đang phát
     pub fx_pitch: f32,  // đổi tông, bán cung -12..12
     pub fx_reverb: f32, // vang 0..100 %
     pub fx_robot: bool, // giọng robot
@@ -72,7 +73,7 @@ pub fn preset(name: &str) -> Params {
     let base = Params {
         ai: true, ai_mix: 85.0, gate_on: true, thr: -52.0, depth: 40.0, hp: 100.0,
         low: -1.0, mud: -3.0, pres: 3.0, air: 1.0, comp: 40.0, gain: 6.0, buf_ms: 60.0,
-        mute: false, monitor: false, agc: false, fx_pitch: 0.0, fx_reverb: 0.0, fx_robot: false,
+        mute: false, monitor: false, agc: false, aec: false, fx_pitch: 0.0, fx_reverb: 0.0, fx_robot: false,
     };
     match name {
         "game" => Params {
@@ -98,6 +99,7 @@ pub fn apply_preset(cur: &Params, name: &str) -> Params {
         mute: cur.mute,
         monitor: cur.monitor,
         agc: cur.agc,
+        aec: cur.aec,
         fx_pitch: cur.fx_pitch,
         fx_reverb: cur.fx_reverb,
         fx_robot: cur.fx_robot,
@@ -118,7 +120,8 @@ pub struct Profile {
 
 /// Áp hồ sơ nhưng giữ nguyên tắt tiếng và nghe thử.
 pub fn apply_profile(cur: &Params, prof: &Profile) -> Params {
-    Params { mute: cur.mute, monitor: cur.monitor, ..prof.params }.sanitized()
+    // khử vọng phụ thuộc loa/phòng của máy này chứ không phải cấu hình giọng nên giữ nguyên
+    Params { mute: cur.mute, monitor: cur.monitor, aec: cur.aec, ..prof.params }.sanitized()
 }
 
 pub fn matches_profile(p: &Params, prof: &Profile) -> bool {

@@ -60,6 +60,8 @@
     <string name="ctl_depth_hint">越高背景越安静</string>
     <string name="ctl_hp">低频滤波</string>
     <string name="ctl_hp_hint">去除风声、桌面震动和电源嗡嗡声</string>
+    <string name="ctl_aec">回声消除</string>
+    <string name="ctl_aec_hint">从麦克风中去除电脑正在播放的声音（通话对方的声音），避免对方听到自己。需要把电脑扬声器或耳机设为默认输出。</string>
     <string name="sec_eq">音色</string>
     <string name="sec_eq_lead">每个滑块范围为 −12 到 +12 dB。</string>
     <string name="ctl_low">低音</string>

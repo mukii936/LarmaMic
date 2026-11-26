@@ -60,6 +60,8 @@ export const id: Dict = {
   'ctl.depth.hint': 'makin tinggi = latar makin sunyi',
   'ctl.hp': 'Filter gemuruh',
   'ctl.hp.hint': 'menghilangkan angin, ketukan meja, dan dengung listrik',
+  'ctl.aec': 'Peredam gema (echo)',
+  'ctl.aec.hint': 'Menghilangkan suara yang diputar PC (lawan bicara) dari mikrofon agar mereka tidak mendengar dirinya sendiri. Perlu speaker atau headphone PC sebagai output default.',
   'sec.eq': 'Nada',
   'sec.eq.lead': 'Setiap slider berkisar dari −12 hingga +12 dB.',
   'ctl.low': 'Bass',

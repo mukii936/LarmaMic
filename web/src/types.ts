@@ -18,6 +18,7 @@ export interface Params {
   mute: boolean;
   monitor: boolean;
   agc: boolean;
+  aec: boolean;
   fx_pitch: number;
   fx_reverb: number;
   fx_robot: boolean;
@@ -52,7 +53,7 @@ export const EMPTY_METER: MeterData = {
 export const PREVIEW_PARAMS: Params = {
   ai: true, ai_mix: 85, gate_on: true, thr: -52, depth: 40, hp: 100, low: -1, mud: -3, pres: 3,
   air: 1, comp: 40, gain: 6, buf_ms: 60, mute: false, monitor: false,
-  agc: false, fx_pitch: 0, fx_reverb: 0, fx_robot: false,
+  agc: false, aec: false, fx_pitch: 0, fx_reverb: 0, fx_robot: false,
 };
 export const PREVIEW_METER: MeterData = {
   in: -38, out: -14, gate: true, buf: 60, under: 0, drops: 0, cal: 0, calp: 0, caln: -99, lat: 96,
@@ -103,6 +104,7 @@ export const SECTIONS: SectionDef[] = [
       { kind: 'slider', key: 'thr', label: 'ctl.thr', hint: 'ctl.thr.hint', min: -72, max: -20, unit: ' dB' },
       { kind: 'slider', key: 'depth', label: 'ctl.depth', hint: 'ctl.depth.hint', min: 6, max: 80, unit: ' dB' },
       { kind: 'slider', key: 'hp', label: 'ctl.hp', hint: 'ctl.hp.hint', min: 40, max: 250, unit: ' Hz' },
+      { kind: 'switch', key: 'aec', label: 'ctl.aec', hint: 'ctl.aec.hint' },
     ],
   },
   {

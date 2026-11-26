@@ -60,6 +60,8 @@
     <string name="ctl_depth_hint">больше = тише фон</string>
     <string name="ctl_hp">Фильтр гула</string>
     <string name="ctl_hp_hint">убирает ветер, стуки по столу и сетевой гул</string>
+    <string name="ctl_aec">Эхоподавление</string>
+    <string name="ctl_aec_hint">Убирает из микрофона то, что воспроизводит ПК (голос собеседника), чтобы он не слышал себя. Нужны динамики или наушники ПК в качестве устройства вывода по умолчанию.</string>
     <string name="sec_eq">Тембр</string>
     <string name="sec_eq_lead">Каждый ползунок меняется от −12 до +12 дБ.</string>
     <string name="ctl_low">Басы</string>

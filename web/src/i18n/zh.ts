@@ -60,6 +60,8 @@ export const zh: Dict = {
   'ctl.depth.hint': '越高背景越安静',
   'ctl.hp': '低频滤波',
   'ctl.hp.hint': '去除风声、桌面震动和电源嗡嗡声',
+  'ctl.aec': '回声消除',
+  'ctl.aec.hint': '从麦克风中去除电脑正在播放的声音（通话对方的声音），避免对方听到自己。需要把电脑扬声器或耳机设为默认输出。',
   'sec.eq': '音色',
   'sec.eq.lead': '每个滑块范围为 −12 到 +12 dB。',
   'ctl.low': '低音',

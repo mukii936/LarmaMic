@@ -60,6 +60,7 @@ val SECTIONS = listOf(
             SliderCtl("thr", R.string.ctl_thr, R.string.ctl_thr_hint, -72, -20, " dB"),
             SliderCtl("depth", R.string.ctl_depth, R.string.ctl_depth_hint, 6, 80, " dB"),
             SliderCtl("hp", R.string.ctl_hp, R.string.ctl_hp_hint, 40, 250, " Hz"),
+            SwitchCtl("aec", R.string.ctl_aec, R.string.ctl_aec_hint),
         ),
     ),
     Section(

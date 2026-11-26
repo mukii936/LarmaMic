@@ -2,6 +2,7 @@
 
 mod adb;
 mod adpcm;
+mod aec;
 mod diag;
 mod dsp;
 mod engine;
@@ -60,6 +61,7 @@ fn main() -> eframe::Result<()> {
     *shared.settings_note.lock() = saved.note.clone();
     let tx = engine::spawn_audio_manager(shared.clone());
     engine::spawn_dsp(shared.clone());
+    engine::spawn_aec_reference(shared.clone());
     server::spawn(shared.clone());
 
     let options = eframe::NativeOptions {

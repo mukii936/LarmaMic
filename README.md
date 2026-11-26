@@ -33,6 +33,7 @@
 - **More mixing control:** a gain slider per phone, and a **Loudest only** mode that follows whoever talks (instead of mixing everyone). Recording also saves each phone as its own track when two or more are connected.
 - **Android extras:** volume buttons mute/unmute the mic even with the screen off, a Mute button in the notification and a Quick Settings tile, and **Hear myself** (the processed voice played back on the phone, use headphones).
 - **Bluetooth uses compression** (IMA ADPCM, 4:1) so it sounds better than plain 24 kHz audio on a slow link.
+- **Echo cancellation:** removes what the PC plays (the other side of a call) from the microphone so they do not hear themselves. It listens to the PC's output (WASAPI loopback), finds the echo delay by itself and subtracts it with an adaptive filter. Tested with simulated echo paths, not yet with a variety of real rooms: use headphones or turn it off if it sounds odd.
 - Three ways to connect: **Wi-Fi**, **USB cable** (USB tethering) and **Bluetooth** (Bluetooth tethering). The QR code carries every address of the PC, and the phone tries them in turn.
 - Run a single portable `larma-mic.exe` (about 9 MB, no installer, no runtime). It sits in the system tray with ≈ 0% CPU and about 4 MB of RAM while hidden.
 - Clean the voice with a processing chain at 48 kHz: AI noise removal ([RNNoise](https://jmvalin.ca/demo/rnnoise/)), rumble filter, noise gate with 5 ms lookahead, 4-band equalizer, auto level (AGC), compressor, volume and a −3 dB limiter.
@@ -145,7 +146,6 @@ The APK is signed with the debug key so it can be installed directly; it is not 
 ## Roadmap
 
 - Code signing for the exe (needs your certificate or a SignPath application)
-- Acoustic echo cancellation
 - Opus instead of ADPCM for Bluetooth
 - The Android app has not been tested on a real device yet; please report problems with audio, connection or the foreground service
 - A native Bluetooth (RFCOMM) link without tethering
@@ -154,6 +154,16 @@ The APK is signed with the debug key so it can be installed directly; it is not 
 ## Contributing
 
 Bug reports, translation fixes and pull requests are welcome. Please open an issue first for larger changes.
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=mukii936%2Flarmamic&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=mukii936/larmamic&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=mukii936/larmamic&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=mukii936/larmamic&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ## Acknowledgments
 

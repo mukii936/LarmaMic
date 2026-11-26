@@ -61,6 +61,8 @@
     <string name="ctl_depth_hint">higher = quieter background</string>
     <string name="ctl_hp">Rumble filter</string>
     <string name="ctl_hp_hint">removes wind, desk thumps and mains hum</string>
+    <string name="ctl_aec">Echo cancellation</string>
+    <string name="ctl_aec_hint">Removes what the PC plays (the other side of a call) from the microphone, so they do not hear themselves. Needs the PC speakers or headphones as the default output.</string>
     <string name="sec_eq">Tone</string>
     <string name="sec_eq_lead">Each slider ranges from −12 to +12 dB.</string>
     <string name="ctl_low">Bass</string>

@@ -60,6 +60,8 @@
     <string name="ctl_depth_hint">plus haut = fond plus silencieux</string>
     <string name="ctl_hp">Filtre anti-grondement</string>
     <string name="ctl_hp_hint">supprime le vent, les chocs sur le bureau et le ronflement du secteur</string>
+    <string name="ctl_aec">Annulation d’écho</string>
+    <string name="ctl_aec_hint">Retire du micro ce que le PC diffuse (l’interlocuteur) pour qu’il ne s’entende pas. Nécessite les haut-parleurs ou le casque du PC comme sortie par défaut.</string>
     <string name="sec_eq">Tonalité</string>
     <string name="sec_eq_lead">Chaque curseur va de −12 à +12 dB.</string>
     <string name="ctl_low">Graves</string>

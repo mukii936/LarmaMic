@@ -60,6 +60,11 @@ pub struct Shared {
     pub sources: Mutex<Vec<Arc<Source>>>,
     /// true = chỉ lấy máy đang nói to nhất thay vì trộn tất cả.
     pub mix_loudest: AtomicBool,
+    /// Âm thanh PC đang phát (loopback, 48 kHz mono) làm tín hiệu tham chiếu cho khử vọng.
+    pub ref_q: Queue,
+    pub ref_on: AtomicBool,
+    /// Lý do khử vọng không chạy được: None = ổn; Some("virtual") = loa mặc định là mic ảo; Some(khác) = lỗi mở loopback.
+    pub aec_err: Mutex<Option<String>>,
     /// Điện thoại đang chờ được cho phép ghép nối.
     pub pending: Mutex<Vec<Arc<PairReq>>>,
     /// Âm thanh đã xử lý (i16, 48 kHz) gửi ngược về điện thoại nào bật "nghe lại" (tai nghe).
@@ -159,6 +164,9 @@ impl Shared {
             params_ver: AtomicU64::new(1),
             sources: Mutex::new(Vec::new()),
             mix_loudest: AtomicBool::new(false),
+            ref_q: Arc::new(Mutex::new(VecDeque::new())),
+            ref_on: AtomicBool::new(false),
+            aec_err: Mutex::new(None),
             pending: Mutex::new(Vec::new()),
             talk: tokio::sync::broadcast::channel(8).0,
             discovery: AtomicBool::new(true),
@@ -338,6 +346,9 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
             let mut tracks: std::collections::HashMap<u64, WavWriter> = std::collections::HashMap::new();
             let mut rec_stem = String::new();
             let mut last_loud: u64 = 0;
+            let mut aec = crate::aec::Aec::new();
+            let mut aec_active = false;
+            let mut ref_tmp: Vec<f32> = Vec::with_capacity(4096);
 
             loop {
                 let p = *sh.params.read();
@@ -470,6 +481,22 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                     continue;
                 }
                 idle = 0;
+
+                // khử vọng: trừ phần micro thu lại âm thanh mà PC đang phát
+                if p.aec && sh.ref_on.load(Relaxed) {
+                    if !aec_active {
+                        aec.reset();
+                        sh.ref_q.lock().clear();
+                        aec_active = true;
+                    }
+                    ref_tmp.clear();
+                    ref_tmp.extend(sh.ref_q.lock().drain(..));
+                    aec.push_ref(&ref_tmp);
+                    aec.process(&mut frame);
+                } else if aec_active {
+                    aec.reset();
+                    aec_active = false;
+                }
 
                 let info = chain.process(&frame, &p, &mut out);
                 store_f(&sh.in_db, lin2db(info.in_peak));
@@ -714,6 +741,96 @@ fn find_device(host: &cpal::Host, name: &str) -> Option<cpal::Device> {
 }
 
 /// cpal::Stream không chuyển luồng được trên Windows, nên một luồng riêng giữ chúng.
+/// Opens the default playback device in loopback mode (what the PC plays) and feeds `q` with 48 kHz mono samples.
+fn open_loopback(dev: &cpal::Device, q: Queue) -> Result<cpal::Stream, String> {
+    let cfg = dev.default_output_config().map_err(|e| e.to_string())?;
+    let rate = cfg.sample_rate().0;
+    let ch = cfg.channels() as usize;
+    let fmt = cfg.sample_format();
+    let sc: cpal::StreamConfig = cfg.into();
+    let mut rs = Resampler::new(rate, 48_000);
+    let mut mono: Vec<f32> = Vec::with_capacity(2048);
+    let mut conv: Vec<f32> = Vec::with_capacity(2048);
+    let err = |e| eprintln!("loopback error: {e}");
+    macro_rules! build {
+        ($t:ty) => {
+            dev.build_input_stream(
+                &sc,
+                move |data: &[$t], _| {
+                    mono.clear();
+                    mono.extend(data.chunks(ch).map(|f| f.iter().map(|s| <f32 as FromSample<$t>>::from_sample_(*s)).sum::<f32>() / ch as f32));
+                    conv.clear();
+                    if rate == 48_000 {
+                        conv.extend_from_slice(&mono);
+                    } else {
+                        rs.process(&mono, &mut conv);
+                    }
+                    let mut g = q.lock();
+                    g.extend(conv.iter().copied());
+                    while g.len() > 96_000 {
+                        g.pop_front(); // keep at most 2 s
+                    }
+                },
+                err,
+                None,
+            )
+        };
+    }
+    let stream = match fmt {
+        SampleFormat::F32 => build!(f32),
+        SampleFormat::I16 => build!(i16),
+        SampleFormat::I32 => build!(i32),
+        f => return Err(tf("audio.err.format", &[&format!("{f:?}")])),
+    }
+    .map_err(|e| e.to_string())?;
+    stream.play().map_err(|e| e.to_string())?;
+    Ok(stream)
+}
+
+/// Thread that keeps the loopback reference stream running while echo cancellation is on, following the default playback device.
+pub fn spawn_aec_reference(sh: Arc<Shared>) {
+    let _ = std::thread::Builder::new().name("aec-ref".into()).spawn(move || {
+        let host = cpal::default_host();
+        let mut stream: Option<cpal::Stream> = None;
+        let mut cur = String::new();
+        loop {
+            let want = sh.params.read().aec;
+            let name = if want { host.default_output_device().and_then(|d| d.name().ok()).unwrap_or_default() } else { String::new() };
+            let usable = want && !name.is_empty() && !is_virtual(&name);
+            if stream.is_some() && (!usable || name != cur) {
+                stream = None;
+                cur.clear();
+                sh.ref_on.store(false, Relaxed);
+                sh.ref_q.lock().clear();
+            }
+            if want && !name.is_empty() && is_virtual(&name) {
+                *sh.aec_err.lock() = Some("virtual".to_string());
+            } else if usable && stream.is_none() {
+                match host.default_output_device().ok_or_else(|| "no device".to_string()).and_then(|d| open_loopback(&d, sh.ref_q.clone())) {
+                    Ok(s) => {
+                        if std::env::var_os("LARMA_DEBUG").is_some() {
+                            crate::win::log_line(&format!("echo cancellation reference opened on: {name}"));
+                        }
+                        stream = Some(s);
+                        cur = name;
+                        sh.ref_on.store(true, Relaxed);
+                        *sh.aec_err.lock() = None;
+                    }
+                    Err(e) => {
+                        if std::env::var_os("LARMA_DEBUG").is_some() {
+                            crate::win::log_line(&format!("echo cancellation reference failed: {e}"));
+                        }
+                        *sh.aec_err.lock() = Some(e);
+                    }
+                }
+            } else if !want {
+                *sh.aec_err.lock() = None;
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
+    });
+}
+
 pub fn spawn_audio_manager(sh: Arc<Shared>) -> mpsc::Sender<Cmd> {
     let (tx, rx) = mpsc::channel::<Cmd>();
     std::thread::Builder::new()

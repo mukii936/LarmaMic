@@ -60,6 +60,8 @@
     <string name="ctl_depth_hint">makin tinggi = latar makin sunyi</string>
     <string name="ctl_hp">Filter gemuruh</string>
     <string name="ctl_hp_hint">menghilangkan angin, ketukan meja, dan dengung listrik</string>
+    <string name="ctl_aec">Peredam gema (echo)</string>
+    <string name="ctl_aec_hint">Menghilangkan suara yang diputar PC (lawan bicara) dari mikrofon agar mereka tidak mendengar dirinya sendiri. Perlu speaker atau headphone PC sebagai output default.</string>
     <string name="sec_eq">Nada</string>
     <string name="sec_eq_lead">Setiap slider berkisar dari −12 hingga +12 dB.</string>
     <string name="ctl_low">Bass</string>

@@ -60,6 +60,8 @@
     <string name="ctl_depth_hint">cao hơn thì nền im hơn</string>
     <string name="ctl_hp">Cắt tiếng ù</string>
     <string name="ctl_hp_hint">bỏ gió, rung bàn, ù điện</string>
+    <string name="ctl_aec">Khử vọng (echo)</string>
+    <string name="ctl_aec_hint">Loại bỏ âm thanh PC đang phát (tiếng người bên kia cuộc gọi) khỏi mic để họ không nghe lại chính mình. Cần loa hoặc tai nghe của PC làm thiết bị phát mặc định.</string>
     <string name="sec_eq">Âm sắc</string>
     <string name="sec_eq_lead">Mỗi thanh chạy từ −12 đến +12 dB.</string>
     <string name="ctl_low">Trầm</string>

@@ -33,6 +33,7 @@
 - **Trộn linh hoạt hơn:** thanh độ lợi riêng cho từng điện thoại, và chế độ **Chỉ người nói to nhất** (thay vì trộn tất cả). Khi ghi âm với từ 2 máy trở lên, mỗi máy còn được lưu thành một track riêng.
 - **Thêm cho Android:** nút âm lượng tắt/bật tiếng mic kể cả khi tắt màn hình, nút Tắt tiếng trong thông báo và ô cài đặt nhanh, và **Nghe lại giọng mình** (giọng đã xử lý phát lại trên điện thoại, nên đeo tai nghe).
 - **Bluetooth có nén âm thanh** (IMA ADPCM, 4:1) nên nghe tốt hơn âm thanh 24 kHz thường trên đường truyền chậm.
+- **Khử vọng (echo):** loại âm thanh PC đang phát (tiếng người bên kia cuộc gọi) khỏi mic để họ không nghe lại chính mình. App nghe âm thanh đầu ra của PC (WASAPI loopback), tự tìm độ trễ của tiếng vọng rồi trừ đi bằng bộ lọc thích nghi. Đã thử với đường vọng mô phỏng, chưa thử nhiều phòng thật: nếu nghe lạ thì dùng tai nghe hoặc tắt đi.
 - Ba cách kết nối: **Wi-Fi**, **cáp USB** (chia sẻ mạng USB) và **Bluetooth** (chia sẻ mạng Bluetooth). Mã QR chứa mọi địa chỉ của PC, điện thoại tự thử lần lượt.
 - Chỉ một file `larma-mic.exe` chạy ngay (khoảng 9 MB, không trình cài, không cần runtime). Khi thu vào khay hệ thống, app dùng ≈ 0% CPU và khoảng 4 MB RAM.
 - Xử lý giọng ở 48 kHz: khử ồn AI ([RNNoise](https://jmvalin.ca/demo/rnnoise/)), cắt tiếng ù, cổng ồn nhìn trước 5 ms, EQ 4 dải, tự cân âm lượng (AGC), nén giọng, âm lượng và bộ chống vỡ tiếng −3 dB.
@@ -145,7 +146,6 @@ APK ký bằng khóa debug để cài trực tiếp được; không dành cho P
 ## Kế hoạch
 
 - Ký số cho file exe (cần chứng chỉ của bạn hoặc đơn đăng ký SignPath)
-- Khử vọng (echo)
 - Opus thay cho ADPCM ở Bluetooth
 - App Android chưa được thử trên máy thật; mong bạn báo lỗi về âm thanh, kết nối hoặc dịch vụ nền
 - Liên kết Bluetooth gốc (RFCOMM) không cần chia sẻ mạng
@@ -154,6 +154,16 @@ APK ký bằng khóa debug để cài trực tiếp được; không dành cho P
 ## Đóng góp
 
 Báo lỗi, sửa bản dịch và pull request đều được chào đón. Với thay đổi lớn, hãy mở issue trước.
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=mukii936%2Flarmamic&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=mukii936/larmamic&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=mukii936/larmamic&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=mukii936/larmamic&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ## Lời cảm ơn
 

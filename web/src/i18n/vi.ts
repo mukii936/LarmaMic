@@ -60,6 +60,8 @@ export const vi: Dict = {
   'ctl.depth.hint': 'cao hơn thì nền im hơn',
   'ctl.hp': 'Cắt tiếng ù',
   'ctl.hp.hint': 'bỏ gió, rung bàn, ù điện',
+  'ctl.aec': 'Khử vọng (echo)',
+  'ctl.aec.hint': 'Loại bỏ âm thanh PC đang phát (tiếng người bên kia cuộc gọi) khỏi mic để họ không nghe lại chính mình. Cần loa hoặc tai nghe của PC làm thiết bị phát mặc định.',
   'sec.eq': 'Âm sắc',
   'sec.eq.lead': 'Mỗi thanh chạy từ −12 đến +12 dB.',
   'ctl.low': 'Trầm',
