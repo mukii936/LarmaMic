@@ -662,7 +662,7 @@ impl App {
         let mut stats = tf(
             "lat.stats",
             &[
-                &self.sh.buf_ms.load(Relaxed).to_string(),
+                &engine::stable(&self.sh.buf_shown, f32::from_bits(self.sh.buf_smooth.load(Relaxed))).to_string(),
                 &self.sh.under.load(Relaxed).to_string(),
                 &self.sh.drops.load(Relaxed).to_string(),
             ],

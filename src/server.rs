@@ -338,7 +338,7 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                     "in": load_f(&sh.in_db),
                     "out": load_f(&sh.out_db),
                     "gate": sh.gate_open.load(Relaxed),
-                    "buf": sh.buf_ms.load(Relaxed),
+                    "buf": crate::engine::stable(&sh.buf_shown, f32::from_bits(sh.buf_smooth.load(Relaxed))),
                     "under": sh.under.load(Relaxed),
                     "drops": sh.drops.load(Relaxed),
                     "cal": sh.cal_state.load(Relaxed),

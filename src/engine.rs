@@ -17,6 +17,23 @@ use std::time::{Duration, Instant};
 
 static START: OnceLock<Instant> = OnceLock::new();
 /// Mili-giây kể từ lúc app khởi động (đồng hồ chung cho các luồng).
+/// Làm tròn tới bội số của 5.
+pub fn round5(v: f32) -> u32 {
+    ((v / 5.0).round() * 5.0).max(0.0) as u32
+}
+
+/// Số hiển thị ổn định: chỉ đổi khi giá trị thật lệch hẳn khỏi số đang hiện (chống nhấp nháy ở ranh giới làm tròn).
+pub fn stable(shown: &AtomicU32, v: f32) -> u32 {
+    let cur = shown.load(Relaxed);
+    if cur == 0 || (v - cur as f32).abs() >= 4.0 {
+        let n = round5(v);
+        shown.store(n, Relaxed);
+        n
+    } else {
+        cur
+    }
+}
+
 pub fn now_ms() -> u64 {
     START.get_or_init(Instant::now).elapsed().as_millis() as u64
 }
@@ -60,6 +77,11 @@ pub struct Shared {
     pub sources: Mutex<Vec<Arc<Source>>>,
     /// true = chỉ lấy máy đang nói to nhất thay vì trộn tất cả.
     pub mix_loudest: AtomicBool,
+    /// Độ trễ và mức đệm đã làm mượt (bit của f32); số thô nhảy theo từng gói nên nhìn rất giật.
+    pub lat_smooth: AtomicU32,
+    pub buf_smooth: AtomicU32,
+    pub lat_shown: AtomicU32,
+    pub buf_shown: AtomicU32,
     /// Âm thanh PC đang phát (loopback, 48 kHz mono) làm tín hiệu tham chiếu cho khử vọng.
     pub ref_q: Queue,
     pub ref_on: AtomicBool,
@@ -164,6 +186,10 @@ impl Shared {
             params_ver: AtomicU64::new(1),
             sources: Mutex::new(Vec::new()),
             mix_loudest: AtomicBool::new(false),
+            lat_smooth: AtomicU32::new(0),
+            buf_smooth: AtomicU32::new(0),
+            lat_shown: AtomicU32::new(0),
+            buf_shown: AtomicU32::new(0),
             ref_q: Arc::new(Mutex::new(VecDeque::new())),
             ref_on: AtomicBool::new(false),
             aec_err: Mutex::new(None),
@@ -231,6 +257,10 @@ impl Shared {
         self.connected.store(!v.is_empty(), Relaxed);
         if v.is_empty() {
             self.rtt_ms.store(0, Relaxed);
+            self.lat_smooth.store(0, Relaxed);
+            self.buf_smooth.store(0, Relaxed);
+            self.lat_shown.store(0, Relaxed);
+            self.buf_shown.store(0, Relaxed);
         }
         drop(v);
         self.wake_ui();
@@ -294,7 +324,13 @@ impl Shared {
 
     /// Độ trễ ước tính từ lúc nói đến lúc tiếng ra thiết bị (ms). Gồm: lấy mẫu trên điện thoại,
     /// đường truyền (nửa khứ hồi), đệm chống giật, hàng đợi xuất, xử lý và bộ đệm của thiết bị.
+    /// Độ trễ ước tính đã làm mượt (cập nhật ở luồng DSP) và làm tròn 5 ms cho đỡ nhấp nháy.
     pub fn latency_ms(&self) -> u32 {
+        let v = f32::from_bits(self.lat_smooth.load(Relaxed));
+        if v <= 0.0 { self.latency_raw() } else { stable(&self.lat_shown, v) }
+    }
+
+    fn latency_raw(&self) -> u32 {
         let p = *self.params.read();
         let rate = self.out_rate.load(Relaxed).max(1) as f32;
         let out_q = self.out_q.lock().len() as f32 * 1000.0 / rate;
@@ -464,7 +500,16 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                         }
                     }
                     got = !parts.is_empty();
-                    sh.buf_ms.store((max_buf as f32 * 1000.0 / SR) as u32, Relaxed);
+                    let buf_now = max_buf as f32 * 1000.0 / SR;
+                    sh.buf_ms.store(buf_now as u32, Relaxed);
+                    // làm mượt ~0,5 giây: hiển thị không còn nhảy theo từng gói
+                    let prev_buf = f32::from_bits(sh.buf_smooth.load(Relaxed));
+                    let buf_sm = if prev_buf <= 0.0 { buf_now } else { prev_buf + (buf_now - prev_buf) * 0.02 };
+                    sh.buf_smooth.store(buf_sm.to_bits(), Relaxed);
+                    let prev_lat = f32::from_bits(sh.lat_smooth.load(Relaxed));
+                    let lat_now = sh.latency_raw() as f32;
+                    let lat_sm = if prev_lat <= 0.0 { lat_now } else { prev_lat + (lat_now - prev_lat) * 0.02 };
+                    sh.lat_smooth.store(lat_sm.to_bits(), Relaxed);
                 }
 
                 if !got {
