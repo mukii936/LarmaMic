@@ -7,6 +7,7 @@ pub static TABLE: &[(&str, &str)] = &[
     ("btn.understood", "확인"),
     ("btn.save", "저장"),
     ("btn.cancel", "취소"),
+    ("app.pick", "실행 중인 프로그램"),
     ("fx.none", "기본"),
     ("fx.deep", "낮은 목소리"),
     ("fx.small", "작은 목소리"),

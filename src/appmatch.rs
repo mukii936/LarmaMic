@@ -30,6 +30,49 @@ struct ProcessEntry32W {
     exe: [u16; 260],
 }
 
+#[link(name = "user32")]
+extern "system" {
+    fn EnumWindows(cb: unsafe extern "system" fn(isize, isize) -> i32, lparam: isize) -> i32;
+    fn IsWindowVisible(hwnd: isize) -> i32;
+    fn GetWindowTextLengthW(hwnd: isize) -> i32;
+    fn GetWindowThreadProcessId(hwnd: isize, pid: *mut u32) -> u32;
+    fn GetWindowLongW(hwnd: isize, index: i32) -> i32;
+}
+
+unsafe extern "system" fn collect_window(hwnd: isize, lparam: isize) -> i32 {
+    const GWL_EXSTYLE: i32 = -20;
+    const WS_EX_TOOLWINDOW: i32 = 0x0000_0080;
+    if IsWindowVisible(hwnd) != 0 && GetWindowTextLengthW(hwnd) > 0 && GetWindowLongW(hwnd, GWL_EXSTYLE) & WS_EX_TOOLWINDOW == 0 {
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        let set = &mut *(lparam as *mut std::collections::HashSet<u32>);
+        set.insert(pid);
+    }
+    1
+}
+
+/// Programs that have a visible window (what the user thinks of as "running apps"), with their real capitalisation,
+/// sorted and without duplicates. This excludes background services, so the list stays short.
+pub fn windowed_programs() -> Vec<String> {
+    let mut pids: std::collections::HashSet<u32> = std::collections::HashSet::new();
+    unsafe {
+        EnumWindows(collect_window, &mut pids as *mut _ as isize);
+    }
+    // shell and system helpers that own windows but are never what the user means
+    const SKIP: [&str; 10] = [
+        "applicationframehost.exe", "textinputhost.exe", "systemsettings.exe", "shellexperiencehost.exe", "searchhost.exe",
+        "startmenuexperiencehost.exe", "lockapp.exe", "explorer.exe", "larma-mic.exe", "larma_mic.exe",
+    ];
+    let mut out: Vec<String> = process_list()
+        .into_iter()
+        .filter(|(pid, n)| pids.contains(pid) && !SKIP.contains(&n.to_lowercase().as_str()))
+        .map(|(_, n)| n)
+        .collect();
+    out.sort_by_key(|n| n.to_lowercase());
+    out.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
+    out
+}
+
 #[link(name = "kernel32")]
 extern "system" {
     fn CreateToolhelp32Snapshot(flags: u32, pid: u32) -> isize;
@@ -40,6 +83,11 @@ extern "system" {
 
 /// Lower-case names of the programs that are running now.
 pub fn running_programs() -> Vec<String> {
+    process_list().into_iter().map(|(_, n)| n.to_lowercase()).collect()
+}
+
+/// (process id, exe name) of every running process.
+fn process_list() -> Vec<(u32, String)> {
     const TH32CS_SNAPPROCESS: u32 = 2;
     let mut names = Vec::new();
     unsafe {
@@ -52,7 +100,7 @@ pub fn running_programs() -> Vec<String> {
         let mut ok = Process32FirstW(snap, &mut e);
         while ok != 0 {
             let len = e.exe.iter().position(|c| *c == 0).unwrap_or(260);
-            names.push(String::from_utf16_lossy(&e.exe[..len]).to_lowercase());
+            names.push((e.pid, String::from_utf16_lossy(&e.exe[..len])));
             ok = Process32NextW(snap, &mut e);
         }
         CloseHandle(snap);
@@ -141,6 +189,18 @@ mod tests {
         assert_eq!(first_match(&rules, &both).map(|r| r.profile.as_str()), Some("game"), "list order decides");
         assert!(first_match(&rules, &["notepad.exe".to_string()]).is_none());
         assert!(first_match(&[AppRule { exe: " ".into(), profile: "raw".into() }], &running).is_none());
+    }
+
+    #[test]
+    fn windowed_programs_is_sorted_and_without_duplicates() {
+        let v = windowed_programs();
+        eprintln!("windowed programs: {v:?}");
+        let mut sorted = v.clone();
+        sorted.sort_by_key(|n| n.to_lowercase());
+        assert_eq!(v, sorted);
+        let mut lower: Vec<String> = v.iter().map(|n| n.to_lowercase()).collect();
+        lower.dedup();
+        assert_eq!(lower.len(), v.len());
     }
 
     #[test]

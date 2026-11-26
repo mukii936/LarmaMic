@@ -176,6 +176,7 @@ pub struct App {
     auto_profile: bool,
     no_update_check: bool,
     new_rule_exe: String,
+    running_cache: (Instant, Vec<String>),
     new_rule_profile: String,
     board_url: String,
     sound_keys: Vec<HotKey>,
@@ -216,6 +217,20 @@ fn register_hotkey(mgr: &Option<GlobalHotKeyManager>, s: &str) -> (Option<HotKey
             Err(e) => (None, Some(tf("hk.err.busy", &[&e.to_string()]))),
         },
     }
+}
+
+/// Đặt nội dung một tab vào cột giữa có bề rộng tối đa `max_w` (không dồn hết sang trái trên cửa sổ rộng).
+fn centered(ui: &mut Ui, max_w: f32, add: impl FnOnce(&mut Ui)) {
+    let avail = ui.available_width();
+    let w = avail.min(max_w);
+    let pad = ((avail - w) / 2.0).max(0.0);
+    ui.horizontal_top(|ui| {
+        ui.add_space(pad);
+        ui.vertical(|ui| {
+            ui.set_width(w);
+            add(ui);
+        });
+    });
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -334,7 +349,6 @@ impl App {
 
     /// Tab Soundboard: thêm âm thanh (file, kéo thả, link), lưới nút phát, âm lượng, hạ giọng, phím tắt.
     fn board_panel(&mut self, ui: &mut Ui) {
-        ui.set_max_width(900.0);
         // kéo thả file vào cửa sổ
         let dropped: Vec<std::path::PathBuf> = ui.ctx().input(|i| i.raw.dropped_files.iter().filter_map(|f| f.path.clone()).collect());
         if !dropped.is_empty() {
@@ -467,6 +481,7 @@ impl App {
             auto_profile: saved.auto_profile,
             no_update_check: saved.no_update_check,
             new_rule_exe: String::new(),
+            running_cache: (Instant::now() - Duration::from_secs(10), Vec::new()),
             new_rule_profile: "game".to_string(),
             board_url: String::new(),
             sound_keys: Vec::new(),
@@ -647,7 +662,6 @@ impl App {
 
     // ---------------- cột trái: kết nối ----------------
     fn connection_panel(&mut self, ui: &mut Ui) {
-        ui.set_max_width(620.0);
         let sources: Vec<Arc<engine::Source>> = self.sh.sources.lock().clone();
         let connected = !sources.is_empty();
         ui.horizontal(|ui| {
@@ -827,7 +841,6 @@ impl App {
 
     /// Tab "Cài đặt": mic ảo (đầu ra), nghe thử, phím tắt, chạy cùng Windows, độ trễ, công cụ.
     fn settings_panel(&mut self, ui: &mut Ui) {
-        ui.set_max_width(620.0);
         let connected = self.sh.connected.load(Relaxed);
         ui.label(RichText::new(t("dev.title")).size(18.0).strong());
         let mut changed = false;
@@ -987,7 +1000,26 @@ impl App {
             self.sh.app_rules.lock().remove(i);
             self.persist(true);
         }
+        // chọn từ các chương trình đang chạy (có cửa sổ), hoặc gõ tên tay
+        if self.running_cache.0.elapsed() > Duration::from_millis(1500) || self.running_cache.1.is_empty() {
+            self.running_cache = (Instant::now(), crate::appmatch::windowed_programs());
+        }
         ui.horizontal_wrapped(|ui| {
+            let mut picked: Option<String> = None;
+            egui::ComboBox::from_id_salt("running_programs")
+                .width(180.0)
+                .selected_text(t("app.pick"))
+                .height(320.0)
+                .show_ui(ui, |ui| {
+                    for name in &self.running_cache.1 {
+                        if ui.selectable_label(name.eq_ignore_ascii_case(self.new_rule_exe.trim()), name).clicked() {
+                            picked = Some(name.clone());
+                        }
+                    }
+                });
+            if let Some(n) = picked {
+                self.new_rule_exe = n;
+            }
             ui.add(egui::TextEdit::singleline(&mut self.new_rule_exe).hint_text("Discord.exe").desired_width(150.0));
             egui::ComboBox::from_id_salt("rule_profile")
                 .selected_text(profile_label(&self.new_rule_profile, &profile_names))
@@ -1196,9 +1228,9 @@ impl App {
         ui.add_space(8.0);
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
             match self.tab {
-                Tab::Connect => self.connection_panel(ui),
-                Tab::Settings => self.settings_panel(ui),
-                Tab::Board => self.board_panel(ui),
+                Tab::Connect => centered(ui, 640.0, |ui| self.connection_panel(ui)),
+                Tab::Settings => centered(ui, 640.0, |ui| self.settings_panel(ui)),
+                Tab::Board => centered(ui, 860.0, |ui| self.board_panel(ui)),
                 Tab::Sound => {
                     self.room_card(ui);
                     let wide = ui.available_width() > 940.0;

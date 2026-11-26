@@ -7,6 +7,7 @@ pub static TABLE: &[(&str, &str)] = &[
     ("btn.understood", "知道了"),
     ("btn.save", "保存"),
     ("btn.cancel", "取消"),
+    ("app.pick", "正在运行的程序"),
     ("fx.none", "原声"),
     ("fx.deep", "低沉"),
     ("fx.small", "小声音"),
