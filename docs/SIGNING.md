@@ -4,7 +4,7 @@
 certificate that belongs to *you*, so it cannot be done from the repository alone. Two realistic options for an open source project:
 
 ## Option A: SignPath Foundation (free for open source)
-1. Apply at <https://signpath.org/foundation> with the repository link (the project is MIT licensed, which they require).
+1. Apply at <https://signpath.org/apply> (see also <https://signpath.org> for the terms and the list of projects) with the repository link (the project is MIT licensed, which they require).
 2. When accepted, SignPath gives you an organization, a project and an API token.
 3. Add the token as the repository secret `SIGNPATH_API_TOKEN`, and the ids as `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`
    and `SIGNPATH_SIGNING_POLICY_SLUG` (repository secrets or variables).
