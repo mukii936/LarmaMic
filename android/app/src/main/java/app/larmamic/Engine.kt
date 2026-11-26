@@ -43,6 +43,9 @@ object Engine {
     val meter = MutableStateFlow(Meter())
     val pcLang = MutableStateFlow<String?>(null)
 
+    /** Soundboard sounds on the PC (id, name): a button for each plays it into the microphone. */
+    val sounds = MutableStateFlow<List<Pair<Int, String>>>(emptyList())
+
     /** "Hear myself": the PC sends the processed voice back and it plays here (use headphones). */
     val talkback = MutableStateFlow(false)
     private var track: android.media.AudioTrack? = null
@@ -106,6 +109,7 @@ object Engine {
         preset.value = null
         profile.value = null
         ptt.value = false
+        sounds.value = emptyList()
         talkback.value = false
         runCatching { track?.stop(); track?.release() }
         track = null
@@ -333,6 +337,9 @@ object Engine {
     private fun onState(m: JSONObject) {
         m.optString("lang").takeIf { it.isNotEmpty() }?.let { pcLang.value = it }
         m.optJSONArray("profiles")?.let { arr -> profiles.value = List(arr.length()) { arr.getString(it) } }
+        m.optJSONArray("sounds")?.let { arr ->
+            sounds.value = List(arr.length()) { val o = arr.getJSONObject(it); o.getInt("id") to o.getString("name") }
+        }
         // ignore the echo of our own edit while a slider is being dragged, so it does not jump
         if (SystemClock.elapsedRealtime() - lastEdit > 450) {
             m.optJSONObject("p")?.let { p ->
@@ -409,6 +416,14 @@ object Engine {
             track = null
         }
         send(JSONObject().put("t", "talkback").put("on", on))
+    }
+
+    fun playSound(id: Int) {
+        send(JSONObject().put("t", "play").put("id", id))
+    }
+
+    fun stopSounds() {
+        send(JSONObject().put("t", "stopsounds"))
     }
 
     fun calibrate() {

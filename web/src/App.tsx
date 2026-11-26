@@ -84,7 +84,7 @@ function SaverScreen({ onExit }: { onExit: () => void }) {
 
 export function App() {
   const {
-    status, message, params, preset, profiles, profile, ptt, meter,
+    status, message, params, preset, profiles, profile, ptt, meter, sounds, playSound, stopSounds,
     setParam, choosePreset, chooseProfile, calibrate, enablePtt, setMuteNow, start, stop,
   } = useMic();
   useLang();
@@ -122,6 +122,9 @@ export function App() {
           profile={profile}
           ptt={ptt}
           meter={meter}
+          sounds={sounds}
+          onPlay={playSound}
+          onStopSounds={stopSounds}
           onNum={setParam}
           onBool={setParam}
           onPreset={choosePreset}

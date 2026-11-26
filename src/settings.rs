@@ -150,6 +150,13 @@ pub struct Saved {
     pub mix_loudest: bool,
     /// true = không cho điện thoại tự tìm thấy PC (không quảng bá mDNS, từ chối xin ghép nối).
     pub no_discovery: bool,
+    /// Tab đang mở lần trước: "connect", "sound", "board" hoặc "settings".
+    pub tab: String,
+    /// Cấu hình theo ứng dụng: tự đổi preset/hồ sơ khi chương trình trong danh sách đang chạy.
+    pub auto_profile: bool,
+    pub app_rules: Vec<crate::appmatch::AppRule>,
+    /// true = không kiểm tra bản mới trên GitHub.
+    pub no_update_check: bool,
     /// Khóa dịch của ghi chú về lần đọc cài đặt này (không lưu ra file), ví dụ "note.backup".
     #[serde(skip)]
     pub note: String,

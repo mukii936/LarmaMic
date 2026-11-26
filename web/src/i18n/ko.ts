@@ -90,4 +90,6 @@ export const ko: Dict = {
   'ctl.robot': '로봇 음성',
   'lang.title': '언어',
   'lang.auto': '자동',
+  'sounds.title': '사운드보드',
+  'sounds.stop': '모두 중지',
 };

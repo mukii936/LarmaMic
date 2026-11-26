@@ -11,6 +11,12 @@ import {
 } from './types';
 import { adoptPcLang, isIos, type Key } from './i18n';
 
+/** A soundboard sound on the PC: tapping its button plays it into the microphone. */
+export interface SoundItem {
+  id: number;
+  name: string;
+}
+
 export type Status = 'idle' | 'connecting' | 'live' | 'retry' | 'error';
 
 /** Thông báo lưu dưới dạng khóa dịch (kèm tham số) để đổi ngôn ngữ thì chữ đổi theo. */
@@ -42,7 +48,7 @@ type ServerMessage =
   | { t: 'ready' }
   | { t: 'denied' }
   | { t: 'ping'; ts: number }
-  | { t: 'state'; p: Params; preset: string | null; profiles: string[]; profile: string | null; lang?: string }
+  | { t: 'state'; p: Params; preset: string | null; profiles: string[]; profile: string | null; lang?: string; sounds?: SoundItem[] }
   | ({ t: 'meter' } & MeterData);
 
 interface Session {
@@ -80,6 +86,7 @@ export function useMic() {
   const [preset, setPreset] = useState<string | null>(import.meta.env.DEV ? 'voice' : null);
   const [profiles, setProfiles] = useState<string[]>(import.meta.env.DEV ? PREVIEW_PROFILES : []);
   const [profile, setProfile] = useState<string | null>(null);
+  const [sounds, setSounds] = useState<SoundItem[]>([]);
   /** Chế độ "bấm giữ để nói": mic chỉ mở khi giữ nút. */
   const [ptt, setPttState] = useState(false);
   /** Số đo mức âm, ghi qua ref để không render lại 15 lần mỗi giây. */
@@ -162,6 +169,7 @@ export function useMic() {
       } else if (m.t === 'state') {
         adoptPcLang(m.lang);
         setProfiles(m.profiles ?? []);
+        setSounds(m.sounds ?? []);
         // Bỏ qua bản "dội lại" của chính mình khi đang kéo thanh, để thanh không giật
         if (Date.now() - lastEdit.current > 450) {
           setParams(m.p);
@@ -356,6 +364,10 @@ export function useMic() {
     [setMuteNow],
   );
 
+  /** Play / stop a soundboard sound on the PC. */
+  const playSound = useCallback((id: number) => send({ t: 'play', id }), [send]);
+  const stopSounds = useCallback(() => send({ t: 'stopsounds' }), [send]);
+
   /** Nhờ PC đo nền ồn trong 3 giây im lặng rồi tự đặt ngưỡng cổng. */
   const calibrate = useCallback(() => {
     lastEdit.current = 0;
@@ -376,7 +388,7 @@ export function useMic() {
   }, [resume, teardown]);
 
   return {
-    status, message, params, preset, profiles, profile, ptt, meter,
+    status, message, params, preset, profiles, profile, ptt, meter, sounds, playSound, stopSounds,
     setParam, choosePreset, chooseProfile, calibrate, enablePtt, setMuteNow, start, stop,
   };
 }

@@ -90,6 +90,8 @@
     <string name="ctl_robot">Roboterstimme</string>
     <string name="lang_title">Sprache</string>
     <string name="lang_auto">Auto</string>
+    <string name="sounds_title">Soundboard</string>
+    <string name="sounds_stop">Alle stoppen</string>
     <string name="notif_title">LarmaMic überträgt</string>
     <string name="notif_text">Zum Öffnen tippen. Das Mikrofon läuft auch bei ausgeschaltetem Bildschirm weiter.</string>
     <string name="notif_stop">Stopp</string>

@@ -90,4 +90,6 @@ export const vi: Dict = {
   'ctl.robot': 'Giọng robot',
   'lang.title': 'Ngôn ngữ',
   'lang.auto': 'Tự động',
+  'sounds.title': 'Soundboard',
+  'sounds.stop': 'Dừng tất cả',
 };

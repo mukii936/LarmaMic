@@ -90,6 +90,8 @@
     <string name="ctl_robot">로봇 음성</string>
     <string name="lang_title">언어</string>
     <string name="lang_auto">자동</string>
+    <string name="sounds_title">사운드보드</string>
+    <string name="sounds_stop">모두 중지</string>
     <string name="notif_title">LarmaMic이 전송 중입니다</string>
     <string name="notif_text">탭하여 열기. 화면이 꺼져도 마이크는 계속 작동합니다.</string>
     <string name="notif_stop">중지</string>

@@ -87,6 +87,8 @@ struct Msg {
     codec: Option<String>,
     /// Cho tin "talkback": true = gửi ngược tiếng đã xử lý về điện thoại này.
     on: Option<bool>,
+    /// Cho tin "play": id âm thanh trong soundboard.
+    id: Option<u32>,
 }
 
 /// So sánh hai chuỗi trong thời gian không phụ thuộc vị trí khác biệt.
@@ -191,6 +193,7 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
     let mut buf: Vec<f32> = Vec::with_capacity(2048);
     let mut ready = false;
     let mut last_ver = u64::MAX;
+    let mut last_board = u64::MAX;
     let mut last_rx = Instant::now();
     let mut last_ping = Instant::now();
     let mut tick = tokio::time::interval(Duration::from_millis(66));
@@ -236,6 +239,12 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                                 // nghe lại giọng mình sau khi xử lý (nên đeo tai nghe); không dùng với ADPCM/Bluetooth
                                 talk_rx = if m.on.unwrap_or(false) && !adpcm { Some(sh.talk.subscribe()) } else { None };
                             }
+                            "play" => {
+                                if let Some(id) = m.id {
+                                    crate::soundboard::play(&sh, id);
+                                }
+                            }
+                            "stopsounds" => crate::soundboard::stop_all(&sh),
                             "calibrate" => {
                                 sh.cal_req.store(true, Relaxed);
                             }
@@ -310,8 +319,10 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                     continue;
                 }
                 let ver = sh.params_ver.load(Relaxed);
-                if ver != last_ver {
+                let board_ver = sh.board_ver.load(Relaxed);
+                if ver != last_ver || board_ver != last_board {
                     last_ver = ver;
+                    last_board = board_ver;
                     let p = *sh.params.read();
                     let preset = PRESET_NAMES.iter().find(|(k, _)| matches_preset(&p, k)).map(|(k, _)| *k);
                     let (names, cur_prof): (Vec<String>, Option<String>) = {
@@ -323,7 +334,8 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                     };
                     let m = json!({
                         "t": "state", "p": p, "preset": preset, "profiles": names, "profile": cur_prof,
-                        "lang": i18n::current().code()
+                        "lang": i18n::current().code(),
+                        "sounds": sh.board.lock().sounds.iter().map(|s| json!({ "id": s.id, "name": s.name })).collect::<Vec<_>>()
                     })
                     .to_string();
                     if let Err(e) = sock.send(Message::Text(m.into())).await { why = tf("srv.why.send.state", &[&e.to_string()]); break; }

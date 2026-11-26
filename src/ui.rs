@@ -4,6 +4,7 @@
 use crate::dsp::{eq_response_db, BANDS};
 use crate::engine::{self, load_f, Cmd, Shared};
 use crate::i18n::{self, t, tf, Lang};
+use crate::soundboard;
 use crate::settings::{
     self, apply_preset, apply_profile, matches_preset, matches_profile, Params, Profile, Saved, DEFAULT_HOTKEY,
     PRESET_NAMES,
@@ -12,7 +13,10 @@ use eframe::egui::{
     self, pos2, vec2, Align, Align2, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Layout,
     Rect, Response, RichText, Sense, Shape, Slider, Stroke, TextStyle, Ui,
 };
-use global_hotkey::{hotkey::HotKey, GlobalHotKeyManager};
+use global_hotkey::{
+    hotkey::{Code, HotKey, Modifiers},
+    GlobalHotKeyManager,
+};
 use std::ops::RangeInclusive;
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::mpsc::Sender;
@@ -167,6 +171,15 @@ pub struct App {
     conn_mode: String,
     mix_loudest: bool,
     no_discovery: bool,
+    tab: Tab,
+    update_dismissed: bool,
+    auto_profile: bool,
+    no_update_check: bool,
+    new_rule_exe: String,
+    new_rule_profile: String,
+    board_url: String,
+    sound_keys: Vec<HotKey>,
+    last_board_ver: u64,
     /// Ô chọn ngôn ngữ đang mở: đã nạp tạm font CJK để hiện tên các ngôn ngữ.
     menu_fonts: bool,
 }
@@ -205,7 +218,216 @@ fn register_hotkey(mgr: &Option<GlobalHotKeyManager>, s: &str) -> (Option<HotKey
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Tab {
+    Connect,
+    Sound,
+    Board,
+    Settings,
+}
+
+impl Tab {
+    const ALL: [Tab; 4] = [Tab::Connect, Tab::Sound, Tab::Board, Tab::Settings];
+    fn code(self) -> &'static str {
+        match self {
+            Tab::Connect => "connect",
+            Tab::Sound => "sound",
+            Tab::Board => "board",
+            Tab::Settings => "settings",
+        }
+    }
+    fn key(self) -> &'static str {
+        match self {
+            Tab::Connect => "tab.connect",
+            Tab::Sound => "tab.sound",
+            Tab::Board => "tab.board",
+            Tab::Settings => "tab.settings",
+        }
+    }
+    fn from_code(s: &str) -> Tab {
+        Tab::ALL.into_iter().find(|t| t.code() == s).unwrap_or(Tab::Connect)
+    }
+}
+
 impl App {
+    /// Tự đo phòng: nói ~10 giây, app gợi ý ngưỡng cổng ồn và EQ (xem room.rs).
+    fn room_card(&mut self, ui: &mut Ui) {
+        let state = self.sh.room_state.load(Relaxed);
+        let connected = self.sh.connected.load(Relaxed);
+        egui::Frame::default().fill(OFF).corner_radius(10.0).inner_margin(12.0).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new(t("room.title")).strong());
+                match state {
+                    1 => {
+                        ui.label(RichText::new(t("room.measuring")).color(SIG));
+                        let pr = f32::from_bits(self.sh.room_progress.load(Relaxed));
+                        ui.add(egui::ProgressBar::new(pr).desired_width(160.0));
+                    }
+                    _ => {
+                        if ui.add_enabled(connected, egui::Button::new(t("room.btn"))).on_hover_text(t("room.hint")).clicked() {
+                            self.sh.room_req.store(true, Relaxed);
+                            self.sh.room_state.store(1, Relaxed);
+                        }
+                        if !connected {
+                            ui.label(RichText::new(t("room.need")).small().color(MUTE));
+                        }
+                    }
+                }
+            });
+            if state == 3 {
+                ui.colored_label(WARN, t("room.fail"));
+            }
+            if state == 2 {
+                let result = *self.sh.room_result.lock();
+                if let Some(r) = result {
+                    ui.label(RichText::new(tf("room.result", &[&format!("{:.0}", r.noise_db), &format!("{:.0}", r.speech_db)])).small().color(MUTE));
+                    let sg = |v: f32| format!("{:+.0}", v);
+                    ui.label(tf("room.sugg", &[&format!("{:.0}", r.thr), &sg(r.low), &sg(r.mud), &sg(r.pres), &sg(r.air)]));
+                    ui.horizontal(|ui| {
+                        if ui.add(egui::Button::new(RichText::new(t("room.apply")).color(ON_SIG)).fill(SIG)).clicked() {
+                            self.p.gate_on = true;
+                            self.p.thr = r.thr;
+                            self.p.low = r.low;
+                            self.p.mud = r.mud;
+                            self.p.pres = r.pres;
+                            self.p.air = r.air;
+                            self.sh.room_state.store(0, Relaxed);
+                        }
+                        if ui.button(t("room.dismiss")).clicked() {
+                            self.sh.room_state.store(0, Relaxed);
+                        }
+                    });
+                    ui.label(RichText::new(t("room.note")).small().color(MUTE));
+                }
+            }
+        });
+        ui.add_space(10.0);
+    }
+
+    /// Đăng ký Ctrl+Alt+1..9 cho chín âm đầu tiên (hoặc gỡ nếu tắt).
+    fn sync_sound_hotkeys(&mut self) {
+        if let Some(m) = &self.hk_mgr {
+            for hk in self.sound_keys.drain(..) {
+                let _ = m.unregister(hk);
+            }
+        }
+        self.sh.sound_hk.lock().clear();
+        let (sounds, on) = {
+            let b = self.sh.board.lock();
+            (b.sounds.iter().take(9).map(|s| s.id).collect::<Vec<u32>>(), b.hotkeys)
+        };
+        if !on {
+            return;
+        }
+        let codes = [Code::Digit1, Code::Digit2, Code::Digit3, Code::Digit4, Code::Digit5, Code::Digit6, Code::Digit7, Code::Digit8, Code::Digit9];
+        if let Some(m) = &self.hk_mgr {
+            for (id, code) in sounds.into_iter().zip(codes) {
+                let hk = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), code);
+                if m.register(hk).is_ok() {
+                    self.sh.sound_hk.lock().insert(hk.id(), id);
+                    self.sound_keys.push(hk);
+                }
+            }
+        }
+    }
+
+    /// Tab Soundboard: thêm âm thanh (file, kéo thả, link), lưới nút phát, âm lượng, hạ giọng, phím tắt.
+    fn board_panel(&mut self, ui: &mut Ui) {
+        ui.set_max_width(900.0);
+        // kéo thả file vào cửa sổ
+        let dropped: Vec<std::path::PathBuf> = ui.ctx().input(|i| i.raw.dropped_files.iter().filter_map(|f| f.path.clone()).collect());
+        if !dropped.is_empty() {
+            soundboard::add_paths_async(self.sh.clone(), dropped);
+        }
+        ui.label(RichText::new(t("board.title")).size(20.0).strong());
+        ui.label(RichText::new(t("board.lead")).small().color(MUTE));
+        ui.add_space(10.0);
+
+        let busy = *self.sh.board_busy.lock();
+        ui.horizontal_wrapped(|ui| {
+            if ui.button(t("board.add.file")).clicked() {
+                soundboard::pick_files(self.sh.clone());
+            }
+            ui.add(egui::TextEdit::singleline(&mut self.board_url).hint_text(t("board.url.hint")).desired_width(340.0));
+            let can = !busy && !self.board_url.trim().is_empty();
+            if ui.add_enabled(can, egui::Button::new(t("board.add.url"))).clicked() {
+                soundboard::add_url_async(self.sh.clone(), self.board_url.trim().to_string());
+                self.board_url.clear();
+            }
+            if busy {
+                ui.label(RichText::new(t("board.downloading")).small().color(SIG));
+            }
+        });
+        ui.label(RichText::new(t("board.drop")).small().color(MUTE));
+        if let Some(e) = self.sh.board_msg.lock().clone() {
+            ui.colored_label(WARN, e);
+        }
+        ui.add_space(8.0);
+
+        // âm lượng, hạ giọng, phím tắt, dừng
+        let (mut volume, mut duck, mut hotkeys) = {
+            let b = self.sh.board.lock();
+            (b.volume, b.duck, b.hotkeys)
+        };
+        let mut changed = false;
+        let mut done = false;
+        ui.horizontal_wrapped(|ui| {
+            ui.label(t("board.volume"));
+            let r = ui.add(egui::Slider::new(&mut volume, 0.0..=1.5).show_value(false));
+            changed |= r.changed();
+            done |= r.drag_stopped();
+            if ui.button(t("board.stop")).clicked() {
+                soundboard::stop_all(&self.sh);
+            }
+        });
+        changed |= ui.checkbox(&mut duck, t("board.duck")).changed();
+        done |= changed && !ui.ctx().input(|i| i.pointer.any_down());
+        let hk_changed = ui.checkbox(&mut hotkeys, t("board.hotkeys")).changed();
+        if changed || hk_changed {
+            {
+                let mut b = self.sh.board.lock();
+                b.volume = volume;
+                b.duck = duck;
+                b.hotkeys = hotkeys;
+            }
+            if done || hk_changed {
+                soundboard::save(&self.sh);
+            }
+        }
+        if !self.p.monitor {
+            ui.label(RichText::new(t("board.listen")).small().color(MUTE));
+        }
+        ui.add_space(8.0);
+        ui.separator();
+        ui.add_space(8.0);
+
+        // lưới nút
+        let sounds: Vec<soundboard::Sound> = self.sh.board.lock().sounds.clone();
+        if sounds.is_empty() {
+            ui.label(RichText::new(t("board.empty")).color(MUTE));
+        }
+        let mut remove: Option<u32> = None;
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+            for (i, s) in sounds.iter().enumerate() {
+                let label = if i < 9 && hotkeys { format!("{}  ·  {}", i + 1, s.name) } else { s.name.clone() };
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 2.0;
+                    if ui.add(egui::Button::new(RichText::new(label).size(15.0)).min_size(vec2(130.0, 36.0))).clicked() {
+                        soundboard::play(&self.sh, s.id);
+                    }
+                    if ui.small_button("×").on_hover_text(t("board.remove")).clicked() {
+                        remove = Some(s.id);
+                    }
+                });
+            }
+        });
+        if let Some(id) = remove {
+            soundboard::remove(&self.sh, id);
+        }
+    }
+
     pub fn new(sh: Arc<Shared>, tx: Sender<Cmd>, saved: Saved, background: bool) -> Self {
         let devices = engine::list_output_devices();
         let out_explicit = !saved.out_device.is_empty() && devices.contains(&saved.out_device);
@@ -240,6 +462,15 @@ impl App {
             conn_mode,
             mix_loudest: saved.mix_loudest,
             no_discovery: saved.no_discovery,
+            tab: Tab::from_code(&saved.tab),
+            update_dismissed: false,
+            auto_profile: saved.auto_profile,
+            no_update_check: saved.no_update_check,
+            new_rule_exe: String::new(),
+            new_rule_profile: "game".to_string(),
+            board_url: String::new(),
+            sound_keys: Vec::new(),
+            last_board_ver: 0,
             menu_fonts: false,
             sh,
             tx,
@@ -305,6 +536,10 @@ impl App {
             conn_mode: self.conn_mode.clone(),
             mix_loudest: self.mix_loudest,
             no_discovery: self.no_discovery,
+            tab: self.tab.code().to_string(),
+            auto_profile: self.auto_profile,
+            app_rules: self.sh.app_rules.lock().clone(),
+            no_update_check: self.no_update_check,
             lang: if Lang::from_code(&self.lang_pref).is_some() { self.lang_pref.clone() } else { String::new() },
             profiles: self.sh.profiles.read().clone(),
             note: String::new(),
@@ -325,6 +560,49 @@ impl App {
     }
 
     /// Ô chọn ngôn ngữ (góc trên bên phải cột trái). "auto" = theo Windows.
+    /// Thanh trên cùng: tên + phiên bản, các tab, trạng thái kết nối và chọn ngôn ngữ.
+    fn tab_bar(&mut self, ui: &mut Ui) {
+        let upd = self.sh.update.lock().clone();
+        if let Some((ver, url)) = upd.filter(|_| !self.update_dismissed) {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(tf("upd.available", &[&ver])).color(SIG));
+                if ui.button(t("upd.get")).clicked() {
+                    {
+                        use std::os::windows::process::CommandExt;
+                        let _ = std::process::Command::new("cmd").args(["/c", "start", "", &url]).creation_flags(0x0800_0000).spawn();
+                    }
+                }
+                if ui.small_button("×").clicked() {
+                    self.update_dismissed = true;
+                }
+            });
+            ui.add_space(4.0);
+        }
+        ui.horizontal(|ui| {
+            ui.label(RichText::new(format!("LarmaMic v{}", env!("CARGO_PKG_VERSION"))).size(14.0).color(MUTE));
+            ui.add_space(14.0);
+            for tab in Tab::ALL {
+                let label = RichText::new(t(tab.key())).size(15.0);
+                if ui.selectable_label(self.tab == tab, label).clicked() && self.tab != tab {
+                    self.tab = tab;
+                    self.persist(true);
+                }
+            }
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                self.language_picker(ui);
+                let n = self.sh.sources.lock().len();
+                let (txt, col) = match n {
+                    0 => (t("status.waiting"), MUTE),
+                    1 => (t("status.connected"), SIG),
+                    n => (tf("status.many", &[&n.to_string()]), SIG),
+                };
+                ui.label(RichText::new(txt).size(13.0).color(col));
+                let (rect, _) = ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
+                ui.painter().circle_filled(rect.center(), 5.0, if n > 0 { SIG } else { GHOST });
+            });
+        });
+    }
+
     fn language_picker(&mut self, ui: &mut Ui) {
         let shown = match Lang::from_code(&self.lang_pref) {
             Some(l) => l.native_name().to_string(),
@@ -369,10 +647,7 @@ impl App {
 
     // ---------------- cột trái: kết nối ----------------
     fn connection_panel(&mut self, ui: &mut Ui) {
-        ui.horizontal(|ui| {
-            ui.label(RichText::new(format!("LarmaMic v{}", env!("CARGO_PKG_VERSION"))).size(14.0).color(MUTE));
-            ui.with_layout(Layout::right_to_left(Align::Center), |ui| self.language_picker(ui));
-        });
+        ui.set_max_width(620.0);
         let sources: Vec<Arc<engine::Source>> = self.sh.sources.lock().clone();
         let connected = !sources.is_empty();
         ui.horizontal(|ui| {
@@ -548,9 +823,12 @@ impl App {
             }
         }
 
-        ui.add_space(14.0);
-        ui.separator();
-        ui.add_space(6.0);
+    }
+
+    /// Tab "Cài đặt": mic ảo (đầu ra), nghe thử, phím tắt, chạy cùng Windows, độ trễ, công cụ.
+    fn settings_panel(&mut self, ui: &mut Ui) {
+        ui.set_max_width(620.0);
+        let connected = self.sh.connected.load(Relaxed);
         ui.label(RichText::new(t("dev.title")).size(18.0).strong());
         let mut changed = false;
         egui::ComboBox::from_id_salt("outdev")
@@ -673,6 +951,74 @@ impl App {
         ui.label(RichText::new(stats).small().color(MUTE));
         ui.label(RichText::new(t("lat.note")).small().color(MUTE));
 
+        // ---- cấu hình theo ứng dụng ----
+        ui.add_space(14.0);
+        ui.separator();
+        ui.add_space(6.0);
+        ui.label(RichText::new(t("app.title")).size(18.0).strong());
+        ui.label(RichText::new(t("app.lead")).small().color(MUTE));
+        if ui.checkbox(&mut self.auto_profile, t("app.toggle")).changed() {
+            self.sh.auto_profile.store(self.auto_profile, Relaxed);
+            self.persist(true);
+        }
+        if let Some(exe) = self.sh.app_active.lock().clone() {
+            ui.label(RichText::new(tf("app.active", &[&exe])).small().color(SIG));
+        }
+        let profile_label = |key: &str, profs: &[String]| -> String {
+            match PRESET_NAMES.iter().find(|(k, _)| *k == key) {
+                Some((_, l)) => t(l),
+                None => profs.iter().find(|n| n.as_str() == key).cloned().unwrap_or_else(|| key.to_string()),
+            }
+        };
+        let profile_names: Vec<String> = self.sh.profiles.read().iter().map(|p| p.name.clone()).collect();
+        let rules = self.sh.app_rules.lock().clone();
+        let mut remove: Option<usize> = None;
+        for (i, r) in rules.iter().enumerate() {
+            ui.horizontal(|ui| {
+                ui.label(RichText::new(&r.exe).monospace());
+                ui.label(RichText::new("→").color(MUTE));
+                ui.label(profile_label(&r.profile, &profile_names));
+                if ui.small_button("×").clicked() {
+                    remove = Some(i);
+                }
+            });
+        }
+        if let Some(i) = remove {
+            self.sh.app_rules.lock().remove(i);
+            self.persist(true);
+        }
+        ui.horizontal_wrapped(|ui| {
+            ui.add(egui::TextEdit::singleline(&mut self.new_rule_exe).hint_text("Discord.exe").desired_width(150.0));
+            egui::ComboBox::from_id_salt("rule_profile")
+                .selected_text(profile_label(&self.new_rule_profile, &profile_names))
+                .show_ui(ui, |ui| {
+                    for (k, l) in PRESET_NAMES.iter() {
+                        ui.selectable_value(&mut self.new_rule_profile, k.to_string(), t(l));
+                    }
+                    for n in &profile_names {
+                        ui.selectable_value(&mut self.new_rule_profile, n.clone(), n.clone());
+                    }
+                });
+            if ui.add_enabled(!self.new_rule_exe.trim().is_empty(), egui::Button::new(t("app.add"))).clicked() {
+                let exe = self.new_rule_exe.trim().to_string();
+                self.sh.app_rules.lock().push(crate::appmatch::AppRule { exe, profile: self.new_rule_profile.clone() });
+                self.new_rule_exe.clear();
+                self.persist(true);
+            }
+        });
+        ui.label(RichText::new(t("app.hint")).small().color(MUTE));
+
+        // ---- kiểm tra bản mới ----
+        ui.add_space(14.0);
+        ui.separator();
+        ui.add_space(6.0);
+        let mut check = !self.no_update_check;
+        if ui.checkbox(&mut check, t("upd.toggle")).changed() {
+            self.no_update_check = !check;
+            self.sh.update_check.store(check, Relaxed);
+            self.persist(true);
+        }
+
         // ---- công cụ: chẩn đoán, cài đặt vào máy ----
         ui.add_space(10.0);
         ui.separator();
@@ -742,6 +1088,8 @@ impl App {
 
     // ---------------- cột phải: đồng hồ + bộ chỉnh ----------------
     fn main_panel(&mut self, ui: &mut Ui, dt: f32) {
+        // Đồng hồ, cấu hình nhanh, hồ sơ, ghi âm: chỉ ở tab Âm thanh (các tab khác cần chỗ cho nội dung của chúng)
+        if self.tab == Tab::Sound {
         ui.horizontal(|ui| {
             ui.label(RichText::new(t("meter.title")).size(18.0).strong());
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -844,24 +1192,33 @@ impl App {
             }
         });
 
+        }
         ui.add_space(8.0);
         egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-            let wide = ui.available_width() > 940.0;
-            let p = &mut self.p;
-            let sh = &self.sh;
-            let connected = sh.connected.load(Relaxed);
-            if wide {
-                ui.columns(3, |c| {
-                    section_noise(&mut c[0], p, sh, connected);
-                    section_eq(&mut c[1], p);
-                    section_volume(&mut c[2], p);
-                    section_fx(&mut c[2], p);
-                });
-            } else {
-                section_noise(ui, p, sh, connected);
-                section_eq(ui, p);
-                section_volume(ui, p);
-                section_fx(ui, p);
+            match self.tab {
+                Tab::Connect => self.connection_panel(ui),
+                Tab::Settings => self.settings_panel(ui),
+                Tab::Board => self.board_panel(ui),
+                Tab::Sound => {
+                    self.room_card(ui);
+                    let wide = ui.available_width() > 940.0;
+                    let p = &mut self.p;
+                    let sh = &self.sh;
+                    let connected = sh.connected.load(Relaxed);
+                    if wide {
+                        ui.columns(3, |c| {
+                            section_noise(&mut c[0], p, sh, connected);
+                            section_eq(&mut c[1], p);
+                            section_volume(&mut c[2], p);
+                            section_fx(&mut c[2], p);
+                        });
+                    } else {
+                        section_noise(ui, p, sh, connected);
+                        section_eq(ui, p);
+                        section_volume(ui, p);
+                        section_fx(ui, p);
+                    }
+                }
             }
             ui.add_space(16.0);
         });
@@ -946,8 +1303,28 @@ fn section_eq(ui: &mut Ui, p: &mut Params) {
     ctl(ui, &t("ctl.air"), &t("ctl.air.hint"), &mut p.air, -12.0..=12.0, " dB");
 }
 
+/// Giọng đổi sẵn: ghép từ các hiệu ứng có sẵn (đổi tông, vang, robot).
+const VOICES: [(&str, f32, f32, bool); 5] = [
+    ("fx.none", 0.0, 0.0, false),
+    ("fx.deep", -5.0, 0.0, false),
+    ("fx.small", 7.0, 0.0, false),
+    ("fx.robot", 0.0, 0.0, true),
+    ("fx.ghost", -2.0, 65.0, false),
+];
+
 fn section_fx(ui: &mut Ui, p: &mut Params) {
     heading(ui, &t("sec.fx"), &t("sec.fx.lead"));
+    ui.horizontal_wrapped(|ui| {
+        for (key, pitch, reverb, robot) in VOICES {
+            let on = p.fx_pitch == pitch && p.fx_reverb == reverb && p.fx_robot == robot;
+            if ui.selectable_label(on, t(key)).clicked() {
+                p.fx_pitch = pitch;
+                p.fx_reverb = reverb;
+                p.fx_robot = robot;
+            }
+        }
+    });
+    ui.add_space(4.0);
     ctl(ui, &t("ctl.pitch"), &t("ctl.pitch.hint"), &mut p.fx_pitch, -12.0..=12.0, &t("ctl.pitch.unit"));
     if p.fx_pitch.abs() > 0.4 {
         ui.label(RichText::new(t("fx.latency")).small().color(MUTE));
@@ -1263,13 +1640,15 @@ impl eframe::App for App {
             self.last_ver = ver;
         }
 
-        egui::SidePanel::left("left")
-            .exact_width(340.0)
-            .resizable(false)
-            .frame(egui::Frame::default().fill(PANEL).inner_margin(18.0))
-            .show(ctx, |ui| {
-                egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| self.connection_panel(ui));
-            });
+        // đồng bộ phím tắt của soundboard khi danh sách đổi
+        let bv = self.sh.board_ver.load(Relaxed);
+        if bv != self.last_board_ver {
+            self.last_board_ver = bv;
+            self.sync_sound_hotkeys();
+        }
+        egui::TopBottomPanel::top("tabs")
+            .frame(egui::Frame::default().fill(PANEL).inner_margin(egui::Margin::symmetric(18, 10)))
+            .show(ctx, |ui| self.tab_bar(ui));
         egui::CentralPanel::default()
             .frame(egui::Frame::default().fill(BG).inner_margin(22.0))
             .show(ctx, |ui| self.main_panel(ui, dt));

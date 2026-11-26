@@ -25,6 +25,9 @@ interface Props {
   onProfile: (name: string) => void;
   onPtt: (on: boolean) => void;
   onCalibrate: () => void;
+  sounds: { id: number; name: string }[];
+  onPlay: (id: number) => void;
+  onStopSounds: () => void;
 }
 
 function SliderRow({ def, value, onChange }: { def: SliderDef; value: number; onChange: (v: number) => void }) {
@@ -102,7 +105,7 @@ function CalibrateRow({ meter, thr, onStart }: { meter: RefObject<MeterData>; th
 }
 
 export function Controls({
-  params, preset, profiles, profile, ptt, meter, onNum, onBool, onPreset, onProfile, onPtt, onCalibrate,
+  params, preset, profiles, profile, ptt, meter, onNum, onBool, onPreset, onProfile, onPtt, onCalibrate, sounds, onPlay, onStopSounds,
 }: Props) {
   useLang();
   return (
@@ -131,6 +134,20 @@ export function Controls({
               {n}
             </button>
           ))}
+        </div>
+      )}
+
+      {sounds.length > 0 && (
+        <div className="profiles" role="group" aria-label={t('sounds.title')}>
+          <span className="plabel">{t('sounds.title')}</span>
+          {sounds.map((s) => (
+            <button key={s.id} type="button" onClick={() => onPlay(s.id)}>
+              {s.name}
+            </button>
+          ))}
+          <button type="button" className="mute" onClick={onStopSounds}>
+            {t('sounds.stop')}
+          </button>
         </div>
       )}
 

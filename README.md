@@ -15,7 +15,7 @@
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat&logo=windows&logoColor=white">
   <img alt="Languages" src="https://img.shields.io/badge/languages-10-38e0c8?style=flat">
   <a href="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml"><img alt="Build" src="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml/badge.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-0.6.0-946ce6?style=flat">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.7.0-946ce6?style=flat">
 
   <br><br>
 
@@ -34,6 +34,12 @@
 - **Android extras:** volume buttons mute/unmute the mic even with the screen off, a Mute button in the notification and a Quick Settings tile, and **Hear myself** (the processed voice played back on the phone, use headphones).
 - **Bluetooth uses compression** (IMA ADPCM, 4:1) so it sounds better than plain 24 kHz audio on a slow link.
 - **Echo cancellation:** removes what the PC plays (the other side of a call) from the microphone so they do not hear themselves. It listens to the PC's output (WASAPI loopback), finds the echo delay by itself and subtracts it with an adaptive filter. Tested with simulated echo paths, not yet with a variety of real rooms: use headphones or turn it off if it sounds odd.
+- **Soundboard:** play sound effects through your microphone. Add mp3/wav/ogg/flac files (button or drag and drop) or paste a direct link to an audio file; each sound is a button, the first nine also get `Ctrl+Alt+1…9`. Optionally lowers your voice while a sound plays, and the phone (web page or Android app) shows the same buttons. Sounds are your own files or links you choose; make sure you may use them.
+- **Voice changer presets:** Deep, Small, Robot and Ghost voices in one click (built from the pitch, reverb and robot effects).
+- **Measure my room:** talk for 10 seconds and the app suggests a noise gate threshold and EQ corrections; you decide whether to apply them.
+- **Per-app profiles:** switch to a preset or saved profile while a program such as Discord or a game is running, and go back when it closes.
+- **Tabs** (Connect, Sound, Soundboard, Settings) keep the desktop app tidy.
+- **Update notice:** the app can tell you when a new release is on GitHub (one small request at startup and every six hours, no personal data; can be turned off in Settings). It never installs anything by itself.
 - Three ways to connect: **Wi-Fi**, **USB cable** (USB tethering) and **Bluetooth** (Bluetooth tethering). The QR code carries every address of the PC, and the phone tries them in turn.
 - Run a single portable `larma-mic.exe` (about 9 MB, no installer, no runtime). It sits in the system tray with ≈ 0% CPU and about 4 MB of RAM while hidden.
 - Clean the voice with a processing chain at 48 kHz: AI noise removal ([RNNoise](https://jmvalin.ca/demo/rnnoise/)), rumble filter, noise gate with 5 ms lookahead, 4-band equalizer, auto level (AGC), compressor, volume and a −3 dB limiter.

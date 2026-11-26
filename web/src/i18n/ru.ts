@@ -90,4 +90,6 @@ export const ru: Dict = {
   'ctl.robot': 'Голос робота',
   'lang.title': 'Язык',
   'lang.auto': 'Авто',
+  'sounds.title': 'Саундборд',
+  'sounds.stop': 'Остановить все',
 };

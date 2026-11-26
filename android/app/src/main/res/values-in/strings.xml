@@ -90,6 +90,8 @@
     <string name="ctl_robot">Suara robot</string>
     <string name="lang_title">Bahasa</string>
     <string name="lang_auto">Otomatis</string>
+    <string name="sounds_title">Soundboard</string>
+    <string name="sounds_stop">Hentikan semua</string>
     <string name="notif_title">LarmaMic sedang mengirim suara</string>
     <string name="notif_text">Ketuk untuk membuka. Mikrofon tetap bekerja saat layar mati.</string>
     <string name="notif_stop">Berhenti</string>

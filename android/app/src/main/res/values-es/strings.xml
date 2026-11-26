@@ -90,6 +90,8 @@
     <string name="ctl_robot">Voz de robot</string>
     <string name="lang_title">Idioma</string>
     <string name="lang_auto">Auto</string>
+    <string name="sounds_title">Tablero de sonidos</string>
+    <string name="sounds_stop">Detener todo</string>
     <string name="notif_title">LarmaMic está transmitiendo</string>
     <string name="notif_text">Toca para abrir. El micrófono sigue funcionando con la pantalla apagada.</string>
     <string name="notif_stop">Detener</string>

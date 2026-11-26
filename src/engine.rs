@@ -77,6 +77,26 @@ pub struct Shared {
     pub sources: Mutex<Vec<Arc<Source>>>,
     /// true = chỉ lấy máy đang nói to nhất thay vì trộn tất cả.
     pub mix_loudest: AtomicBool,
+    /// Tự đo phòng (xem room.rs): yêu cầu, trạng thái (0 rảnh, 1 đang đo, 2 xong, 3 không đo được), tiến độ, kết quả.
+    pub room_req: AtomicBool,
+    pub room_state: AtomicU8,
+    pub room_progress: AtomicU32,
+    pub room_result: Mutex<Option<crate::room::RoomResult>>,
+    /// Cấu hình theo ứng dụng.
+    pub auto_profile: AtomicBool,
+    pub app_rules: Mutex<Vec<crate::appmatch::AppRule>>,
+    pub app_active: Mutex<Option<String>>,
+    /// Bản mới trên GitHub: (phiên bản, đường dẫn).
+    pub update: Mutex<Option<(String, String)>>,
+    pub update_check: AtomicBool,
+    /// Soundboard: thư viện âm thanh, các âm đang phát, thông báo lỗi/đang tải.
+    pub board: Mutex<crate::soundboard::Board>,
+    pub board_ver: AtomicU64,
+    /// id phím tắt toàn cục -> id âm thanh (Ctrl+Alt+1..9).
+    pub sound_hk: Mutex<std::collections::HashMap<u32, u32>>,
+    pub board_msg: Mutex<Option<String>>,
+    pub board_busy: Mutex<bool>,
+    pub playing: Mutex<Vec<crate::soundboard::Playing>>,
     /// Độ trễ và mức đệm đã làm mượt (bit của f32); số thô nhảy theo từng gói nên nhìn rất giật.
     pub lat_smooth: AtomicU32,
     pub buf_smooth: AtomicU32,
@@ -186,6 +206,21 @@ impl Shared {
             params_ver: AtomicU64::new(1),
             sources: Mutex::new(Vec::new()),
             mix_loudest: AtomicBool::new(false),
+            room_req: AtomicBool::new(false),
+            room_state: AtomicU8::new(0),
+            room_progress: AtomicU32::new(0),
+            room_result: Mutex::new(None),
+            auto_profile: AtomicBool::new(false),
+            app_rules: Mutex::new(Vec::new()),
+            app_active: Mutex::new(None),
+            update: Mutex::new(None),
+            update_check: AtomicBool::new(true),
+            board: Mutex::new(crate::soundboard::Board::default()),
+            board_ver: AtomicU64::new(1),
+            sound_hk: Mutex::new(std::collections::HashMap::new()),
+            board_msg: Mutex::new(None),
+            board_busy: Mutex::new(false),
+            playing: Mutex::new(Vec::new()),
             lat_smooth: AtomicU32::new(0),
             buf_smooth: AtomicU32::new(0),
             lat_shown: AtomicU32::new(0),
@@ -384,6 +419,12 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
             let mut last_loud: u64 = 0;
             let mut aec = crate::aec::Aec::new();
             let mut aec_active = false;
+            let mut duck_g = 1.0f32;
+            let mut room_meas: Option<(crate::room::RoomMeter, Instant)> = None;
+            let mut in_ring = [0f32; FFT_N];
+            let mut in_pos = 0usize;
+            let mut room_tick = 0u32;
+            let mut room_bands = [-120f32; BANDS];
             let mut ref_tmp: Vec<f32> = Vec::with_capacity(4096);
 
             loop {
@@ -512,6 +553,12 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                     sh.lat_smooth.store(lat_sm.to_bits(), Relaxed);
                 }
 
+                // soundboard đang phát mà chưa có điện thoại nào nối: vẫn xử lý một khung im lặng để âm thanh ra mic ảo
+                if !got && room && !sh.playing.lock().is_empty() {
+                    frame.iter_mut().for_each(|s| *s = 0.0);
+                    got = true;
+                }
+
                 if !got {
                     // Không có âm thanh: đo mức rơi dần về im lặng, đẩy im lặng ra thiết bị
                     // để mic ảo không bị treo tiếng cuối.
@@ -543,9 +590,84 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                     aec_active = false;
                 }
 
+                // tự đo phòng: nghe ~10 giây giọng nói rồi gợi ý ngưỡng cổng ồn và EQ
+                if sh.room_req.swap(false, Relaxed) {
+                    room_meas = Some((crate::room::RoomMeter::new(), Instant::now()));
+                    sh.room_state.store(1, Relaxed);
+                    sh.room_progress.store(0f32.to_bits(), Relaxed);
+                    *sh.room_result.lock() = None;
+                }
+                if let Some((meter, started)) = room_meas.as_mut() {
+                    for &v in frame.iter() {
+                        in_ring[in_pos] = v;
+                        in_pos = (in_pos + 1) % FFT_N;
+                    }
+                    room_tick += 1;
+                    if room_tick % 2 == 0 {
+                        let mut ordered = [0f32; FFT_N];
+                        for (i, o) in ordered.iter_mut().enumerate() {
+                            *o = in_ring[(in_pos + i) % FFT_N];
+                        }
+                        spectrum_bands(&ordered, &mut room_bands);
+                    }
+                    let rms = (frame.iter().map(|x| x * x).sum::<f32>() / FRAME as f32).sqrt();
+                    meter.feed(20.0 * rms.max(1e-6).log10(), &room_bands);
+                    sh.room_progress.store((meter.len() as f32 / crate::room::FRAMES_TARGET as f32).min(1.0).to_bits(), Relaxed);
+                    if meter.len() >= crate::room::FRAMES_TARGET {
+                        match meter.finish() {
+                            Some(r) => {
+                                *sh.room_result.lock() = Some(r);
+                                sh.room_state.store(2, Relaxed);
+                            }
+                            None => sh.room_state.store(3, Relaxed),
+                        }
+                        room_meas = None;
+                        sh.wake_ui();
+                    } else if started.elapsed() > Duration::from_secs(40) {
+                        sh.room_state.store(3, Relaxed);
+                        room_meas = None;
+                        sh.wake_ui();
+                    }
+                }
+
                 let info = chain.process(&frame, &p, &mut out);
+                let mut sound_peak = 0f32;
+
+                // soundboard: trộn các âm đang phát vào đầu ra (sau bộ lọc, để lọc ồn không nuốt hiệu ứng âm thanh)
+                {
+                    let mut pl = sh.playing.lock();
+                    let active = !pl.is_empty();
+                    let (volume, duck) = {
+                        let b = sh.board.lock();
+                        (b.volume, b.duck)
+                    };
+                    let duck_target = if active && duck { 0.4 } else { 1.0 };
+                    duck_g += (duck_target - duck_g) * 0.05;
+                    if (duck_g - 1.0).abs() > 0.002 {
+                        out.iter_mut().for_each(|o| *o *= duck_g);
+                    }
+                    if active {
+                        let mut mix = [0f32; FRAME];
+                        for p in pl.iter_mut() {
+                            let end = (p.pos + FRAME).min(p.buf.len());
+                            for (m, v) in mix.iter_mut().zip(&p.buf[p.pos..end]) {
+                                *m += *v;
+                            }
+                            p.pos = end;
+                        }
+                        pl.retain(|p| p.pos < p.buf.len());
+                        for (o, m) in out.iter_mut().zip(&mix) {
+                            *o = (*o + *m * volume).clamp(-0.98, 0.98);
+                            sound_peak = sound_peak.max(o.abs());
+                        }
+                        if pl.is_empty() {
+                            drop(pl);
+                            sh.wake_ui();
+                        }
+                    }
+                }
                 store_f(&sh.in_db, lin2db(info.in_peak));
-                store_f(&sh.out_db, lin2db(info.out_peak));
+                store_f(&sh.out_db, lin2db(info.out_peak.max(sound_peak)));
                 store_f(&sh.vad, info.vad);
                 sh.gate_open.store(info.gate_open, Relaxed);
 

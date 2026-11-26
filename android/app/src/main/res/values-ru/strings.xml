@@ -90,6 +90,8 @@
     <string name="ctl_robot">Голос робота</string>
     <string name="lang_title">Язык</string>
     <string name="lang_auto">Авто</string>
+    <string name="sounds_title">Саундборд</string>
+    <string name="sounds_stop">Остановить все</string>
     <string name="notif_title">LarmaMic передаёт звук</string>
     <string name="notif_text">Нажмите, чтобы открыть. Микрофон работает и при выключенном экране.</string>
     <string name="notif_stop">Стоп</string>

@@ -90,6 +90,8 @@
     <string name="ctl_robot">Voix de robot</string>
     <string name="lang_title">Langue</string>
     <string name="lang_auto">Auto</string>
+    <string name="sounds_title">Soundboard</string>
+    <string name="sounds_stop">Tout arrêter</string>
     <string name="notif_title">LarmaMic diffuse le son</string>
     <string name="notif_text">Touchez pour ouvrir. Le micro continue de fonctionner écran éteint.</string>
     <string name="notif_stop">Arrêter</string>

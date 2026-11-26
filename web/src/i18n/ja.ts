@@ -90,4 +90,6 @@ export const ja: Dict = {
   'ctl.robot': 'ロボットボイス',
   'lang.title': '言語',
   'lang.auto': '自動',
+  'sounds.title': 'サウンドボード',
+  'sounds.stop': 'すべて停止',
 };

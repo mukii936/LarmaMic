@@ -90,6 +90,8 @@
     <string name="ctl_robot">Giọng robot</string>
     <string name="lang_title">Ngôn ngữ</string>
     <string name="lang_auto">Tự động</string>
+    <string name="sounds_title">Soundboard</string>
+    <string name="sounds_stop">Dừng tất cả</string>
     <string name="notif_title">LarmaMic đang truyền tiếng</string>
     <string name="notif_text">Chạm để mở. Mic vẫn hoạt động khi tắt màn hình.</string>
     <string name="notif_stop">Dừng</string>

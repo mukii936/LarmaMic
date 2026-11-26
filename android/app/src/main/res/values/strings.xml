@@ -91,6 +91,8 @@
     <string name="ctl_robot">Robot voice</string>
     <string name="lang_title">Language</string>
     <string name="lang_auto">Auto</string>
+    <string name="sounds_title">Soundboard</string>
+    <string name="sounds_stop">Stop all</string>
     <string name="notif_title">LarmaMic is streaming</string>
     <string name="notif_text">Tap to open. The microphone keeps working with the screen off.</string>
     <string name="notif_stop">Stop</string>

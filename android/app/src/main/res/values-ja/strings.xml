@@ -90,6 +90,8 @@
     <string name="ctl_robot">ロボットボイス</string>
     <string name="lang_title">言語</string>
     <string name="lang_auto">自動</string>
+    <string name="sounds_title">サウンドボード</string>
+    <string name="sounds_stop">すべて停止</string>
     <string name="notif_title">LarmaMic が送信中です</string>
     <string name="notif_text">タップして開きます。画面を消してもマイクは動作します。</string>
     <string name="notif_stop">停止</string>

@@ -88,4 +88,6 @@ export const en = {
   'ctl.robot': 'Robot voice',
   'lang.title': 'Language',
   'lang.auto': 'Auto',
+  'sounds.title': 'Soundboard',
+  'sounds.stop': 'Stop all',
 } as const;

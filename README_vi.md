@@ -15,7 +15,7 @@
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat&logo=windows&logoColor=white">
   <img alt="Languages" src="https://img.shields.io/badge/languages-10-38e0c8?style=flat">
   <a href="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml"><img alt="Build" src="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml/badge.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-0.6.0-946ce6?style=flat">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.7.0-946ce6?style=flat">
 
   <br><br>
 
@@ -34,6 +34,12 @@
 - **Thêm cho Android:** nút âm lượng tắt/bật tiếng mic kể cả khi tắt màn hình, nút Tắt tiếng trong thông báo và ô cài đặt nhanh, và **Nghe lại giọng mình** (giọng đã xử lý phát lại trên điện thoại, nên đeo tai nghe).
 - **Bluetooth có nén âm thanh** (IMA ADPCM, 4:1) nên nghe tốt hơn âm thanh 24 kHz thường trên đường truyền chậm.
 - **Khử vọng (echo):** loại âm thanh PC đang phát (tiếng người bên kia cuộc gọi) khỏi mic để họ không nghe lại chính mình. App nghe âm thanh đầu ra của PC (WASAPI loopback), tự tìm độ trễ của tiếng vọng rồi trừ đi bằng bộ lọc thích nghi. Đã thử với đường vọng mô phỏng, chưa thử nhiều phòng thật: nếu nghe lạ thì dùng tai nghe hoặc tắt đi.
+- **Soundboard:** phát hiệu ứng âm thanh qua mic. Thêm file mp3/wav/ogg/flac (nút hoặc kéo thả) hoặc dán link trực tiếp tới file âm thanh; mỗi âm là một nút, chín âm đầu còn có phím `Ctrl+Alt+1…9`. Có thể hạ giọng bạn xuống khi đang phát, và điện thoại (trang web hoặc app Android) cũng có các nút này. Âm thanh là file hoặc link do bạn chọn, hãy chắc rằng bạn được phép dùng chúng.
+- **Đổi giọng sẵn:** giọng trầm, giọng nhỏ, robot, giọng ma chỉ một cú bấm (ghép từ các hiệu ứng đổi tông, vang và robot).
+- **Tự đo phòng:** nói 10 giây, app gợi ý ngưỡng cổng ồn và cách chỉnh EQ; bạn quyết định có áp dụng hay không.
+- **Cấu hình theo ứng dụng:** tự đổi sang một cấu hình nhanh hoặc hồ sơ khi chương trình như Discord hay game đang chạy, và quay lại khi nó đóng.
+- **Tab** (Kết nối, Âm thanh, Soundboard, Cài đặt) giúp app trên PC gọn gàng hơn.
+- **Báo bản mới:** app có thể báo khi GitHub có bản phát hành mới (một yêu cầu nhỏ lúc khởi động và mỗi sáu giờ, không gửi dữ liệu cá nhân; tắt được trong Cài đặt). App không tự cài gì cả.
 - Ba cách kết nối: **Wi-Fi**, **cáp USB** (chia sẻ mạng USB) và **Bluetooth** (chia sẻ mạng Bluetooth). Mã QR chứa mọi địa chỉ của PC, điện thoại tự thử lần lượt.
 - Chỉ một file `larma-mic.exe` chạy ngay (khoảng 9 MB, không trình cài, không cần runtime). Khi thu vào khay hệ thống, app dùng ≈ 0% CPU và khoảng 4 MB RAM.
 - Xử lý giọng ở 48 kHz: khử ồn AI ([RNNoise](https://jmvalin.ca/demo/rnnoise/)), cắt tiếng ù, cổng ồn nhìn trước 5 ms, EQ 4 dải, tự cân âm lượng (AGC), nén giọng, âm lượng và bộ chống vỡ tiếng −3 dB.

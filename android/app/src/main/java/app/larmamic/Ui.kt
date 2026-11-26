@@ -406,6 +406,16 @@ private fun Controls() {
                 }
             }
         }
+        val boardSounds by Engine.sounds.collectAsState()
+        if (boardSounds.isNotEmpty()) {
+            Text(stringResource(R.string.sounds_title), color = Mute, fontSize = 14.sp)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                boardSounds.forEach { (id, name) ->
+                    OutlinedButton(onClick = { Engine.playSound(id) }, shape = RoundedCornerShape(12.dp)) { Text(name, color = Ink) }
+                }
+                OutlinedButton(onClick = { Engine.stopSounds() }, shape = RoundedCornerShape(12.dp)) { Text(stringResource(R.string.sounds_stop), color = Warn) }
+            }
+        }
         SwitchRow(stringResource(R.string.ptt_title), stringResource(R.string.ptt_hint), ptt) { Engine.enablePtt(it) }
         val hear by Engine.talkback.collectAsState()
         val mode by Engine.mode.collectAsState()

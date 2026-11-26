@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod adb;
+mod appmatch;
 mod adpcm;
 mod aec;
 mod diag;
@@ -8,9 +9,12 @@ mod dsp;
 mod engine;
 mod i18n;
 mod icon;
+mod room;
 mod server;
+mod soundboard;
 mod settings;
 mod ui;
+mod update;
 mod wav;
 mod win;
 
@@ -57,6 +61,12 @@ fn main() -> eframe::Result<()> {
     shared.beep.store(!saved.no_beep, Relaxed);
     shared.mix_loudest.store(saved.mix_loudest, Relaxed);
     shared.discovery.store(!saved.no_discovery, Relaxed);
+    soundboard::load(&shared);
+    shared.auto_profile.store(saved.auto_profile, Relaxed);
+    *shared.app_rules.lock() = saved.app_rules.clone();
+    shared.update_check.store(!saved.no_update_check, Relaxed);
+    appmatch::spawn(shared.clone());
+    update::spawn(shared.clone());
     *shared.profiles.write() = saved.profiles.clone();
     *shared.settings_note.lock() = saved.note.clone();
     let tx = engine::spawn_audio_manager(shared.clone());
@@ -213,7 +223,11 @@ fn spawn_events(sh: Arc<engine::Shared>, ctx: egui::Context, ids: Option<TrayIds
             }
             while let Ok(ev) = GlobalHotKeyEvent::receiver().try_recv() {
                 if ev.state == HotKeyState::Pressed {
-                    set_mute(&sh, None);
+                    let sound = sh.sound_hk.lock().get(&ev.id).copied();
+                    match sound {
+                        Some(id) => soundboard::play(&sh, id),
+                        None => set_mute(&sh, None),
+                    }
                     ctx.request_repaint();
                 }
             }
