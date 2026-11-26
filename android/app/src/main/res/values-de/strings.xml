@@ -104,7 +104,7 @@
     <string name="mode_title">Verbindung</string>
     <string name="mode_usb">USB-Kabel</string>
     <string name="mode_wifi_hint">Handy und PC müssen im selben WLAN sein.</string>
-    <string name="mode_usb_hint">Kabel am PC anschließen, in den Handy-Einstellungen USB-Tethering aktivieren (Netzwerk &gt; Hotspot und Tethering) und den QR-Code scannen. Kein WLAN nötig.</string>
+    <string name="mode_usb_hint">Kabel am PC anschließen, dann am Handy USB-Debugging aktivieren (wird automatisch erkannt) oder USB-Tethering (Netzwerk &gt; Hotspot und Tethering). Kein WLAN nötig.</string>
     <string name="mode_bt_hint">Handy und PC in den Bluetooth-Einstellungen koppeln, auf dem Handy Bluetooth-Tethering aktivieren, am PC dessen Netzwerk beitreten und den QR-Code scannen. Langsamer als WLAN: Audio wird mit 24 kHz gesendet.</string>
     <string name="err_addr">Scanne zuerst den QR-Code oder füge die in LarmaMic angezeigte Adresse ein.</string>
 </resources>

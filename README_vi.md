@@ -70,7 +70,7 @@
    | Chế độ | Làm gì |
    |:---|:---|
    | **Wi-Fi** | Để điện thoại và PC cùng Wi-Fi. |
-   | **Cáp USB** | Cắm điện thoại vào PC và bật **Chia sẻ kết nối qua USB** trong cài đặt điện thoại. Không cần Wi-Fi. |
+   | **Cáp USB** | Android đã bật **Gỡ lỗi USB** (một lần): cắm cáp là LarmaMic tự mở trên điện thoại và tự kết nối, không cần quét QR hay Wi-Fi. Cần công cụ `adb` của Android (tự tìm, hoặc một cú bấm trong app để tải từ Google). Nếu không thì bật **Chia sẻ kết nối qua USB** trên điện thoại. |
    | **Bluetooth** | Ghép đôi điện thoại với PC, bật **Chia sẻ kết nối qua Bluetooth** trên điện thoại và vào mạng đó trên PC. Chậm hơn nên app Android gửi âm thanh 24 kHz. |
 
 4. Quét mã QR trong LarmaMic:
@@ -135,7 +135,7 @@ APK ký bằng khóa debug để cài trực tiếp được; không dành cho P
 
 - Ký số cho file exe
 - App Android chưa được thử trên máy thật; mong bạn báo lỗi về âm thanh, kết nối hoặc dịch vụ nền
-- Liên kết Bluetooth gốc (RFCOMM) không cần chia sẻ mạng, và tự chạy `adb reverse` cho USB debugging
+- Liên kết Bluetooth gốc (RFCOMM) không cần chia sẻ mạng
 - App desktop cho macOS và Linux
 
 ## Đóng góp

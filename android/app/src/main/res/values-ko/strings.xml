@@ -104,7 +104,7 @@
     <string name="mode_title">연결 방식</string>
     <string name="mode_usb">USB 케이블</string>
     <string name="mode_wifi_hint">휴대폰과 PC가 같은 Wi-Fi에 있어야 합니다.</string>
-    <string name="mode_usb_hint">케이블을 PC에 연결하고 휴대폰 설정에서 USB 테더링을 켠 다음(네트워크 &gt; 핫스팟 및 테더링) QR 코드를 스캔하세요. Wi-Fi는 필요 없습니다.</string>
+    <string name="mode_usb_hint">케이블을 PC에 연결한 다음 휴대폰에서 USB 디버깅을 켜거나(자동 인식) USB 테더링을 켜세요(네트워크 &gt; 핫스팟 및 테더링). Wi-Fi는 필요 없습니다.</string>
     <string name="mode_bt_hint">블루투스 설정에서 휴대폰과 PC를 페어링하고, 휴대폰에서 블루투스 테더링을 켜고 PC에서 해당 네트워크에 연결한 다음 QR 코드를 스캔하세요. Wi-Fi보다 느리며 오디오는 24 kHz로 전송됩니다.</string>
     <string name="err_addr">먼저 QR 코드를 스캔하거나 LarmaMic에 표시된 주소를 붙여넣으세요.</string>
 </resources>

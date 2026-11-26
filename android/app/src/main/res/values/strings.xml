@@ -105,7 +105,7 @@
     <string name="mode_title">Connection</string>
     <string name="mode_usb">USB cable</string>
     <string name="mode_wifi_hint">The phone and the PC must be on the same Wi-Fi.</string>
-    <string name="mode_usb_hint">Plug the cable into the PC, turn on USB tethering in the phone settings (Network &gt; Hotspot and tethering), then scan the QR code. No Wi-Fi needed.</string>
+    <string name="mode_usb_hint">Plug the cable into the PC, then either turn on USB debugging on the phone (detected automatically) or turn on USB tethering (Network &gt; Hotspot and tethering). No Wi-Fi needed.</string>
     <string name="mode_bt_hint">Pair the phone with the PC in Bluetooth settings, turn on Bluetooth tethering on the phone and join its network on the PC, then scan the QR code. Slower than Wi-Fi: audio is sent at 24 kHz.</string>
     <string name="err_addr">Scan the QR code first, or paste the address shown in LarmaMic.</string>
 </resources>

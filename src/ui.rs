@@ -397,12 +397,44 @@ impl App {
                 }
             }
         });
+        self.sh.usb_auto.store(self.conn_mode == "usb", Relaxed);
         let hint_key = match self.conn_mode.as_str() {
             "usb" => "mode.usb.hint",
             "bt" => "mode.bt.hint",
             _ => "mode.wifi.hint",
         };
         ui.label(RichText::new(t(hint_key)).small().color(MUTE));
+        if self.conn_mode == "usb" {
+            // Cách tự nhận qua cáp: gỡ lỗi USB + adb (xem adb.rs)
+            match self.sh.adb_state.load(Relaxed) {
+                crate::adb::READY => {
+                    ui.label(RichText::new(t("adb.ready")).small().color(SIG));
+                }
+                crate::adb::UNAUTHORIZED => {
+                    ui.colored_label(WARN, t("adb.unauth"));
+                }
+                crate::adb::MISSING => {
+                    ui.label(RichText::new(t("adb.missing")).small().color(MUTE));
+                    let dl = self.sh.adb_dl.lock().clone();
+                    match dl {
+                        Some(s) if s.is_empty() => {
+                            ui.label(RichText::new(t("adb.getting")).small().color(SIG));
+                        }
+                        other => {
+                            if let Some(e) = other {
+                                ui.colored_label(WARN, tf("adb.fail", &[&e]));
+                            }
+                            if ui.button(t("adb.get")).clicked() {
+                                crate::adb::download(self.sh.clone());
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    ui.label(RichText::new(t("adb.wait")).small().color(MUTE));
+                }
+            }
+        }
         ui.add_space(6.0);
         if base.is_empty() {
             ui.label(RichText::new(t("srv.starting")).color(MUTE));

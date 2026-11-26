@@ -8,9 +8,15 @@ import java.net.URI
 data class Connection(val host: String, val port: Int, val token: String, val alt: List<String> = emptyList()) {
     val key get() = "$host:$port"
 
-    /** Addresses to try. USB/Bluetooth tethering put the PC on another network, so those come first in those modes. */
-    fun hosts(mode: String): List<String> =
-        if (mode == "wifi") (listOf(host) + alt).distinct() else (alt + host).distinct()
+    /**
+     * Addresses to try, in the order the PC listed them (it puts the best one for its connection mode first).
+     * 127.0.0.1 only works through the USB cable (adb reverse): first in USB mode, last otherwise.
+     */
+    fun hosts(mode: String): List<String> {
+        val all = (listOf(host) + alt).distinct()
+        val (loop, rest) = all.partition { it == "127.0.0.1" }
+        return if (mode == "usb") loop + rest else rest + loop
+    }
 
     fun wsUrl(h: String) = "wss://$h:$port/ws?k=${java.net.URLEncoder.encode(token, "UTF-8")}"
 

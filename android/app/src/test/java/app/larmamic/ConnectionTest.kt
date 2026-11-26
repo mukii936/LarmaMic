@@ -18,9 +18,8 @@ class ConnectionTest {
     fun readsExtraAddressesForUsbAndBluetooth() {
         val c = Connection.parse("https://192.168.1.5:8443/?k=tok&h=192.168.42.1,10.0.0.2")!!
         assertEquals(listOf("192.168.42.1", "10.0.0.2"), c.alt)
-        // Wi-Fi mode tries the main address first, USB/Bluetooth try the tethering ones first
         assertEquals(listOf("192.168.1.5", "192.168.42.1", "10.0.0.2"), c.hosts("wifi"))
-        assertEquals(listOf("192.168.42.1", "10.0.0.2", "192.168.1.5"), c.hosts("usb"))
+        assertEquals(listOf("192.168.1.5", "192.168.42.1", "10.0.0.2"), c.hosts("bt"))
     }
 
     @Test
@@ -40,5 +39,12 @@ class ConnectionTest {
     fun buildsWebSocketUrlForAnyHost() {
         val c = Connection("10.0.0.2", 8443, "a b")
         assertEquals("wss://192.168.42.1:8443/ws?k=a+b", c.wsUrl("192.168.42.1"))
+    }
+
+    @Test
+    fun usbCableLinkThroughAdbUsesLoopbackFirst() {
+        val c = Connection("127.0.0.1", 8443, "t", listOf("192.168.42.1", "192.168.1.5"))
+        assertEquals(listOf("127.0.0.1", "192.168.42.1", "192.168.1.5"), c.hosts("usb"))
+        assertEquals(listOf("192.168.42.1", "192.168.1.5", "127.0.0.1"), c.hosts("wifi"))
     }
 }

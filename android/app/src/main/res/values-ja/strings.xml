@@ -104,7 +104,7 @@
     <string name="mode_title">接続方法</string>
     <string name="mode_usb">USB ケーブル</string>
     <string name="mode_wifi_hint">スマートフォンと PC が同じ Wi-Fi に接続されている必要があります。</string>
-    <string name="mode_usb_hint">ケーブルを PC に接続し、スマートフォンの設定で USB テザリングをオン（ネットワーク &gt; アクセスポイントとテザリング）にして、QR コードをスキャンします。Wi-Fi は不要です。</string>
+    <string name="mode_usb_hint">ケーブルを PC に接続し、スマートフォンで USB デバッグをオン（自動認識）にするか、USB テザリング（ネットワーク &gt; アクセスポイントとテザリング）をオンにします。Wi-Fi は不要です。</string>
     <string name="mode_bt_hint">Bluetooth 設定でスマートフォンと PC をペアリングし、スマートフォンで Bluetooth テザリングをオンにして PC でそのネットワークに参加し、QR コードをスキャンします。Wi-Fi より遅く、音声は 24 kHz で送信されます。</string>
     <string name="err_addr">先に QR コードをスキャンするか、LarmaMic に表示されたアドレスを貼り付けてください。</string>
 </resources>

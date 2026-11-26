@@ -104,7 +104,7 @@
     <string name="mode_title">Подключение</string>
     <string name="mode_usb">USB-кабель</string>
     <string name="mode_wifi_hint">Телефон и ПК должны быть в одной сети Wi-Fi.</string>
-    <string name="mode_usb_hint">Подключите кабель к ПК, включите USB-модем в настройках телефона (Сеть &gt; Точка доступа и модем) и отсканируйте QR-код. Wi-Fi не нужен.</string>
+    <string name="mode_usb_hint">Подключите кабель к ПК, затем включите на телефоне отладку по USB (определится автоматически) или USB-модем (Сеть &gt; Точка доступа и модем). Wi-Fi не нужен.</string>
     <string name="mode_bt_hint">Сопрягите телефон с ПК в настройках Bluetooth, включите Bluetooth-модем на телефоне, подключитесь к его сети на ПК и отсканируйте QR-код. Медленнее Wi-Fi: звук передаётся на 24 кГц.</string>
     <string name="err_addr">Сначала отсканируйте QR-код или вставьте адрес, показанный в LarmaMic.</string>
 </resources>

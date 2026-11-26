@@ -104,7 +104,7 @@
     <string name="mode_title">连接方式</string>
     <string name="mode_usb">USB 数据线</string>
     <string name="mode_wifi_hint">手机和电脑必须在同一 Wi-Fi 下。</string>
-    <string name="mode_usb_hint">把数据线接到电脑，在手机设置中开启 USB 网络共享（网络 &gt; 热点和网络共享），然后扫描二维码。无需 Wi-Fi。</string>
+    <string name="mode_usb_hint">把数据线接到电脑，然后在手机上开启 USB 调试（自动识别），或开启 USB 网络共享（网络 &gt; 热点和网络共享）。无需 Wi-Fi。</string>
     <string name="mode_bt_hint">在蓝牙设置中配对手机和电脑，在手机上开启蓝牙网络共享并在电脑上加入该网络，然后扫描二维码。比 Wi-Fi 慢：音频以 24 kHz 发送。</string>
     <string name="err_addr">请先扫描二维码，或粘贴 LarmaMic 中显示的地址。</string>
 </resources>

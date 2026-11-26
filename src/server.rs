@@ -293,13 +293,18 @@ fn other_hosts(primary: &str) -> Vec<String> {
 }
 
 pub fn spawn(sh: Arc<Shared>) {
+    crate::adb::spawn(sh.clone());
     // Cập nhật danh sách địa chỉ phụ mỗi vài giây: card mạng USB/Bluetooth chỉ xuất hiện sau khi cắm cáp hoặc bật chia sẻ mạng
     let hosts_sh = sh.clone();
     let _ = std::thread::Builder::new().name("hosts".into()).spawn(move || loop {
         let primary = hosts_sh.url.lock().clone();
         let primary = primary.trim_start_matches("https://").split(':').next().unwrap_or("").to_string();
         if !primary.is_empty() {
-            let now = other_hosts(&primary);
+            let mut now = other_hosts(&primary);
+            // điện thoại cắm cáp có bật gỡ lỗi USB: adb reverse đã dựng, điện thoại vào PC qua 127.0.0.1
+            if hosts_sh.adb_state.load(Relaxed) == crate::adb::READY {
+                now.insert(0, "127.0.0.1".to_string());
+            }
             let mut cur = hosts_sh.alt_hosts.lock();
             if *cur != now {
                 *cur = now;

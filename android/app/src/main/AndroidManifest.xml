@@ -31,6 +31,11 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- sent by LarmaMic on the PC over the USB cable (adb), see MainActivity.handleLink -->
+            <intent-filter>
+                <action android:name="app.larmamic.CONNECT" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <activity

@@ -52,6 +52,12 @@ pub struct Shared {
     pub url: Mutex<String>,
     /// Các địa chỉ khác của PC (chia sẻ mạng qua USB/Bluetooth, điểm phát sóng): đưa vào QR để điện thoại tự thử lần lượt.
     pub alt_hosts: Mutex<Vec<String>>,
+    /// Trạng thái adb (xem adb.rs): 0 chưa có adb, 1 chưa thấy điện thoại, 2 chưa cho phép gỡ lỗi USB, 3 đã nối.
+    pub adb_state: std::sync::atomic::AtomicU8,
+    /// Tải adb: None = rảnh, Some("") = đang tải, Some(lỗi) = thất bại.
+    pub adb_dl: Mutex<Option<String>>,
+    /// Đang ở chế độ "Cáp USB": khi thấy điện thoại, tự mở app Android và gửi sẵn mã ghép nối (không cần quét QR).
+    pub usb_auto: std::sync::atomic::AtomicBool,
     pub server_err: Mutex<Option<String>>,
     pub out_err: Mutex<Option<String>>,
     /// Tên thiết bị đầu ra đang chọn (để lưu khi thoát từ khay).
@@ -132,6 +138,9 @@ impl Shared {
             drops: AtomicU32::new(0),
             url: Mutex::new(String::new()),
             alt_hosts: Mutex::new(Vec::new()),
+            adb_state: std::sync::atomic::AtomicU8::new(0),
+            adb_dl: Mutex::new(None),
+            usb_auto: std::sync::atomic::AtomicBool::new(false),
             server_err: Mutex::new(None),
             out_err: Mutex::new(None),
             out_name: Mutex::new(String::new()),

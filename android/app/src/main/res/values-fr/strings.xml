@@ -104,7 +104,7 @@
     <string name="mode_title">Connexion</string>
     <string name="mode_usb">Câble USB</string>
     <string name="mode_wifi_hint">Le téléphone et le PC doivent être sur le même Wi-Fi.</string>
-    <string name="mode_usb_hint">Branchez le câble au PC, activez le partage de connexion USB dans les réglages du téléphone (Réseau &gt; Point d’accès et partage), puis scannez le QR code. Pas besoin de Wi-Fi.</string>
+    <string name="mode_usb_hint">Branchez le câble au PC, puis activez le débogage USB sur le téléphone (détection automatique) ou le partage de connexion USB (Réseau &gt; Point d’accès et partage). Pas besoin de Wi-Fi.</string>
     <string name="mode_bt_hint">Appairez le téléphone au PC dans les réglages Bluetooth, activez le partage de connexion Bluetooth sur le téléphone et rejoignez son réseau sur le PC, puis scannez le QR code. Plus lent que le Wi-Fi : l’audio est envoyé à 24 kHz.</string>
     <string name="err_addr">Scannez d’abord le QR code, ou collez l’adresse affichée par LarmaMic.</string>
 </resources>

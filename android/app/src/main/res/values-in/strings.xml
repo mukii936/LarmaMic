@@ -104,7 +104,7 @@
     <string name="mode_title">Koneksi</string>
     <string name="mode_usb">Kabel USB</string>
     <string name="mode_wifi_hint">Ponsel dan PC harus berada di Wi-Fi yang sama.</string>
-    <string name="mode_usb_hint">Colokkan kabel ke PC, aktifkan tethering USB di pengaturan ponsel (Jaringan &gt; Hotspot dan tethering), lalu pindai kode QR. Tidak perlu Wi-Fi.</string>
+    <string name="mode_usb_hint">Colokkan kabel ke PC, lalu aktifkan Debugging USB di ponsel (terdeteksi otomatis) atau aktifkan tethering USB (Jaringan &gt; Hotspot dan tethering). Tidak perlu Wi-Fi.</string>
     <string name="mode_bt_hint">Pasangkan ponsel dengan PC di pengaturan Bluetooth, aktifkan tethering Bluetooth di ponsel dan gabung ke jaringannya di PC, lalu pindai kode QR. Lebih lambat dari Wi-Fi: audio dikirim pada 24 kHz.</string>
     <string name="err_addr">Pindai kode QR dulu, atau tempel alamat yang tampil di LarmaMic.</string>
 </resources>

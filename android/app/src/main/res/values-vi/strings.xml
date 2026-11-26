@@ -104,7 +104,7 @@
     <string name="mode_title">Kết nối</string>
     <string name="mode_usb">Cáp USB</string>
     <string name="mode_wifi_hint">Điện thoại và PC phải cùng Wi-Fi.</string>
-    <string name="mode_usb_hint">Cắm cáp vào PC, bật “Chia sẻ kết nối qua USB” trong cài đặt điện thoại (Mạng &gt; Điểm phát sóng và chia sẻ), rồi quét mã QR. Không cần Wi-Fi.</string>
+    <string name="mode_usb_hint">Cắm cáp vào PC, rồi bật Gỡ lỗi USB trên điện thoại (tự nhận) hoặc bật Chia sẻ kết nối qua USB (Mạng &gt; Điểm phát sóng và chia sẻ). Không cần Wi-Fi.</string>
     <string name="mode_bt_hint">Ghép đôi điện thoại với PC trong cài đặt Bluetooth, bật chia sẻ kết nối qua Bluetooth trên điện thoại và vào mạng đó trên PC, rồi quét mã QR. Chậm hơn Wi-Fi: âm thanh gửi ở 24 kHz.</string>
     <string name="err_addr">Hãy quét mã QR trước, hoặc dán địa chỉ hiện trong LarmaMic.</string>
 </resources>

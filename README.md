@@ -70,7 +70,7 @@
    | Mode | What to do |
    |:---|:---|
    | **Wi-Fi** | Put the phone and the PC on the same Wi-Fi. |
-   | **USB cable** | Plug the phone into the PC and turn on **USB tethering** in the phone settings. No Wi-Fi needed. |
+   | **USB cable** | Android with **USB debugging** (turned on once): plug the cable in and LarmaMic opens on the phone and connects by itself, no QR code and no Wi-Fi. It needs Android's `adb` tool (found automatically, or one click in the app downloads it from Google). Otherwise turn on **USB tethering** on the phone. |
    | **Bluetooth** | Pair the phone with the PC, turn on **Bluetooth tethering** on the phone and join its network on the PC. Slower, so the Android app sends 24 kHz audio. |
 
 4. Scan the QR code from LarmaMic:
@@ -135,7 +135,7 @@ The APK is signed with the debug key so it can be installed directly; it is not 
 
 - Code signing for the exe
 - The Android app has not been tested on a real device yet; please report problems with audio, connection or the foreground service
-- A native Bluetooth (RFCOMM) link without tethering, and automatic `adb reverse` for USB debugging
+- A native Bluetooth (RFCOMM) link without tethering
 - macOS and Linux desktop apps
 
 ## Contributing
