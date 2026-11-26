@@ -25,6 +25,9 @@ interface TapMessage {
 }
 
 /** Mã ghép nối lấy từ địa chỉ trong mã QR (?k=...). */
+/** Name shown in the PC's device list (the browser hides the exact model). */
+const DEVICE = /iPad/.test(navigator.userAgent) ? 'iPad' : /iPhone/.test(navigator.userAgent) ? 'iPhone' : /Android/.test(navigator.userAgent) ? 'Android' : 'Browser';
+
 export const TOKEN = (() => {
   const fromUrl = new URLSearchParams(location.search).get('k');
   try {
@@ -133,7 +136,7 @@ export function useMic() {
     const ws = new WebSocket(`wss://${location.host}/ws?k=${encodeURIComponent(TOKEN)}`);
     ws.binaryType = 'arraybuffer';
     cur.ws = ws;
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', rate: cur.ctx?.sampleRate }));
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'hello', rate: cur.ctx?.sampleRate, device: DEVICE }));
     ws.onmessage = (e: MessageEvent<unknown>) => {
       if (typeof e.data !== 'string') return;
       let m: ServerMessage;
@@ -219,7 +222,7 @@ export function useMic() {
 
     // Đang nối sẵn với PC: báo tần số lấy mẫu của luồng mới
     const ws = s.current.ws;
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: 'hello', rate: ctx.sampleRate }));
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ t: 'hello', rate: ctx.sampleRate, device: DEVICE }));
   }, [closeAudio]);
 
   const failWith = useCallback((err: unknown) => {

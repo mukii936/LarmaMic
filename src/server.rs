@@ -81,6 +81,8 @@ struct Msg {
     p: Option<serde_json::Value>,
     name: Option<String>,
     ts: Option<u64>,
+    /// Tên thiết bị trong tin "hello" (ví dụ "Pixel 7"), hiện trong danh sách thiết bị trên PC.
+    device: Option<String>,
 }
 
 /// So sánh hai chuỗi trong thời gian không phụ thuộc vị trí khác biệt.
@@ -111,8 +113,10 @@ async fn deny(mut sock: WebSocket) {
 }
 
 async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
-    let gen = sh.conn_gen.fetch_add(1, SeqCst) + 1;
-    sh.reset_input();
+    // Nhiều điện thoại nối cùng lúc: mỗi kết nối có một Source riêng (tạo khi nhận "hello").
+    // conn_gen chỉ đổi khi đổi mã ghép nối: lúc đó mọi kết nối cũ phải thoát.
+    let epoch = sh.conn_gen.load(SeqCst);
+    let mut src: Option<Arc<crate::engine::Source>> = None;
     let mut rs: Option<Resampler> = None;
     let mut buf: Vec<f32> = Vec::with_capacity(2048);
     let mut ready = false;
@@ -120,7 +124,6 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
     let mut last_rx = Instant::now();
     let mut last_ping = Instant::now();
     let mut tick = tokio::time::interval(Duration::from_millis(66));
-    sh.rtt_ms.store(0, Relaxed);
     #[allow(unused_assignments)]
     let mut why = t("srv.why.unknown");
 
@@ -133,9 +136,9 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                     None => { why = t("srv.why.closed"); break }
                 };
                 last_rx = Instant::now();
-                if sh.conn_gen.load(SeqCst) != gen {
+                if sh.conn_gen.load(SeqCst) != epoch || src.as_ref().is_some_and(|s| s.kicked.load(Relaxed)) {
                     why = t("srv.why.replaced");
-                    break; // ngắt kết nối cũ
+                    break; // đổi mã, hoặc bị ngắt từ giao diện / vì có quá nhiều máy
                 }
                 match msg {
                     Message::Text(t) => {
@@ -144,8 +147,11 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                             "hello" => {
                                 let rate = m.rate.unwrap_or(48_000).clamp(8_000, 192_000);
                                 rs = (rate != 48_000).then(|| Resampler::new(rate, 48_000));
-                                sh.connected.store(true, SeqCst);
-                                sh.wake_ui();
+                                if src.is_none() {
+                                    let name = m.device.clone().filter(|d| !d.trim().is_empty()).map(|d| d.trim().chars().take(32).collect::<String>());
+                                    let name = name.unwrap_or_else(|| tf("src.default", &[&(sh.sources.lock().len() + 1).to_string()]));
+                                    src = Some(sh.add_source(&name));
+                                }
                                 ready = true;
                                 last_ver = u64::MAX; // gửi trạng thái ngay ở nhịp tới
                                 let _ = sock.send(Message::Text(r#"{"t":"ready"}"#.into())).await;
@@ -191,7 +197,9 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                             Some(r) => r.process(&raw, &mut buf),
                             None => buf.extend_from_slice(&raw),
                         }
-                        sh.push_input(&buf);
+                        if let Some(s) = &src {
+                            sh.push_input(s, &buf);
+                        }
                     }
                     Message::Close(_) => { why = t("srv.why.closecmd"); break }
                     _ => {}
@@ -249,8 +257,8 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
     }
     *sh.last_disconnect.lock() = why.clone();
     crate::win::log_line(&tf("srv.log.disc", &[&why]));
-    if sh.conn_gen.load(SeqCst) == gen {
-        sh.connected.store(false, SeqCst);
+    if let Some(s) = src {
+        sh.remove_source(s.id);
     }
     sh.wake_ui();
 }

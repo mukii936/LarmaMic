@@ -141,7 +141,7 @@ object Engine {
                 rec.startRecording()
                 record = rec
                 // tell the PC the real rate (it resamples if it is not 48 kHz)
-                ws?.send(JSONObject().put("t", "hello").put("rate", rec.sampleRate).toString())
+                ws?.send(JSONObject().put("t", "hello").put("rate", rec.sampleRate).put("device", android.os.Build.MODEL).toString())
                 while (running) {
                     val n = rec.read(shorts, 0, frame)
                     if (n <= 0) throw IllegalStateException("read failed: $n")
@@ -214,7 +214,7 @@ object Engine {
     private val listener = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
             val rate = record?.sampleRate ?: 48000
-            webSocket.send(JSONObject().put("t", "hello").put("rate", rate).toString())
+            webSocket.send(JSONObject().put("t", "hello").put("rate", rate).put("device", android.os.Build.MODEL).toString())
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {

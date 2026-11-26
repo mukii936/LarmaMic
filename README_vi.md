@@ -15,7 +15,7 @@
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat&logo=windows&logoColor=white">
   <img alt="Languages" src="https://img.shields.io/badge/languages-10-38e0c8?style=flat">
   <a href="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml"><img alt="Build" src="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml/badge.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-946ce6?style=flat">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.5.0-946ce6?style=flat">
 
   <br><br>
 
@@ -28,6 +28,7 @@
 ## Tính năng
 
 - Dùng **iPhone** mà không cài gì (quét mã QR rồi mở trang bằng Safari), hoặc **app Android** riêng, vẫn truyền tiếp khi tắt màn hình.
+- **Nhiều điện thoại cùng lúc** (tối đa 4, iPhone hay Android đều được): tiếng của các máy được trộn vào một mic ảo duy nhất. App PC liệt kê từng máy với mức tiếng và cho tắt tiếng hoặc ngắt riêng từng máy. Nút tắt tiếng và giữ-để-nói tác động lên cả hỗn hợp.
 - Ba cách kết nối: **Wi-Fi**, **cáp USB** (chia sẻ mạng USB) và **Bluetooth** (chia sẻ mạng Bluetooth). Mã QR chứa mọi địa chỉ của PC, điện thoại tự thử lần lượt.
 - Chỉ một file `larma-mic.exe` chạy ngay (khoảng 9 MB, không trình cài, không cần runtime). Khi thu vào khay hệ thống, app dùng ≈ 0% CPU và khoảng 4 MB RAM.
 - Xử lý giọng ở 48 kHz: khử ồn AI ([RNNoise](https://jmvalin.ca/demo/rnnoise/)), cắt tiếng ù, cổng ồn nhìn trước 5 ms, EQ 4 dải, tự cân âm lượng (AGC), nén giọng, âm lượng và bộ chống vỡ tiếng −3 dB.
@@ -118,7 +119,8 @@ App Android (`android/`) cần JDK 17 và Android SDK (platform 35):
 
 ```powershell
 cd android
-.\gradlew.bat testDebugUnitTest assembleRelease   # appuild\outputspkeleasepp-release.apk
+.\gradlew.bat testDebugUnitTest assembleRelease   # appuild\outputspk
+eleasepp-release.apk
 ```
 
 APK ký bằng khóa debug để cài trực tiếp được; không dành cho Play Store.

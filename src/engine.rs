@@ -21,9 +21,25 @@ pub fn now_ms() -> u64 {
     START.get_or_init(Instant::now).elapsed().as_millis() as u64
 }
 
-pub struct InputQ {
-    pub q: VecDeque<f32>,
-    pub primed: bool,
+/// Số điện thoại tối đa nối cùng lúc (máy thứ 5 vào thì máy cũ nhất bị ngắt).
+pub const MAX_SOURCES: usize = 4;
+
+struct SrcQ {
+    q: VecDeque<f32>,
+    primed: bool,
+}
+
+/// Một điện thoại đang nối: hàng đợi nhận riêng (bộ đệm chống giật riêng), tắt tiếng riêng.
+/// Âm thanh của các máy được trộn lại trước khi vào chuỗi xử lý.
+pub struct Source {
+    pub id: u64,
+    pub name: Mutex<String>,
+    pub muted: AtomicBool,
+    /// Giao diện bấm ngắt máy này: luồng của nó tự thoát.
+    pub kicked: AtomicBool,
+    /// Đỉnh (tuyến tính, bit của f32) của gói mới nhất, để giao diện vẽ thanh mức.
+    pub peak: AtomicU32,
+    q: Mutex<SrcQ>,
 }
 
 pub type Queue = Arc<Mutex<VecDeque<f32>>>;
@@ -32,7 +48,8 @@ pub struct Shared {
     pub params: RwLock<Params>,
     /// Tăng mỗi khi thông số đổi (từ app PC hoặc từ điện thoại) để các bên biết mà đồng bộ.
     pub params_ver: AtomicU64,
-    pub input: Mutex<InputQ>,
+    pub sources: Mutex<Vec<Arc<Source>>>,
+    next_source: AtomicU64,
     pub out_q: Queue,
     pub out_rate: AtomicU32, // 0 = chưa có thiết bị xuất
     pub mon_q: Queue,
@@ -122,7 +139,8 @@ impl Shared {
             wake: OnceLock::new(),
             params: RwLock::new(p),
             params_ver: AtomicU64::new(1),
-            input: Mutex::new(InputQ { q: VecDeque::new(), primed: false }),
+            sources: Mutex::new(Vec::new()),
+            next_source: AtomicU64::new(1),
             out_q: Arc::new(Mutex::new(VecDeque::new())),
             out_rate: AtomicU32::new(0),
             mon_q: Arc::new(Mutex::new(VecDeque::new())),
@@ -147,10 +165,62 @@ impl Shared {
         })
     }
 
-    /// Server gọi khi nhận được âm thanh 48 kHz mono.
-    pub fn push_input(&self, samples: &[f32]) {
+    /// Có điện thoại mới nối vào (sau tin "hello"). Quá MAX_SOURCES thì ngắt máy cũ nhất.
+    pub fn add_source(&self, name: &str) -> Arc<Source> {
+        let id = self.next_source.fetch_add(1, Relaxed);
+        let src = Arc::new(Source {
+            id,
+            name: Mutex::new(name.to_string()),
+            muted: AtomicBool::new(false),
+            kicked: AtomicBool::new(false),
+            peak: AtomicU32::new(0),
+            q: Mutex::new(SrcQ { q: VecDeque::new(), primed: false }),
+        });
+        {
+            let mut v = self.sources.lock();
+            if v.is_empty() {
+                self.under.store(0, Relaxed);
+                self.drops.store(0, Relaxed);
+            }
+            while v.len() >= MAX_SOURCES {
+                let old = v.remove(0);
+                old.kicked.store(true, Relaxed);
+            }
+            v.push(src.clone());
+            self.connected.store(true, Relaxed);
+        }
+        self.wake_ui();
+        src
+    }
+
+    pub fn remove_source(&self, id: u64) {
+        let mut v = self.sources.lock();
+        v.retain(|s| s.id != id);
+        self.connected.store(!v.is_empty(), Relaxed);
+        if v.is_empty() {
+            self.rtt_ms.store(0, Relaxed);
+        }
+        drop(v);
+        self.wake_ui();
+    }
+
+    /// Ngắt mọi điện thoại (đổi mã ghép nối).
+    pub fn kick_all(&self) {
+        self.conn_gen.fetch_add(1, Relaxed);
+        let mut v = self.sources.lock();
+        for s in v.iter() {
+            s.kicked.store(true, Relaxed);
+        }
+        v.clear();
+        self.connected.store(false, Relaxed);
+    }
+
+    /// Server gọi khi một điện thoại gửi âm thanh 48 kHz mono tới.
+    pub fn push_input(&self, src: &Source, samples: &[f32]) {
         let target = (self.params.read().buf_ms / 1000.0 * SR) as usize;
-        let mut iq = self.input.lock();
+        let peak = samples.iter().fold(0f32, |m, x| m.max(x.abs()));
+        src.peak.store(peak.to_bits(), Relaxed);
+        let mut iq = src.q.lock();
         iq.q.extend(samples.iter().copied());
         let limit = target + (SR * 0.15) as usize;
         if iq.q.len() > limit {
@@ -159,14 +229,6 @@ impl Shared {
             iq.q.drain(..cut);
             self.drops.fetch_add(1, Relaxed);
         }
-    }
-
-    pub fn reset_input(&self) {
-        let mut iq = self.input.lock();
-        iq.q.clear();
-        iq.primed = false;
-        self.under.store(0, Relaxed);
-        self.drops.store(0, Relaxed);
     }
 
     pub fn set_params(&self, p: Params) {
@@ -298,22 +360,39 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                 let mut got = false;
                 if room {
                     let target = ((p.buf_ms / 1000.0 * SR) as usize).max(FRAME);
-                    let mut iq = sh.input.lock();
-                    if !iq.primed && iq.q.len() >= target {
-                        iq.primed = true;
-                    }
-                    if iq.primed {
-                        if iq.q.len() >= FRAME {
-                            for s in frame.iter_mut() {
-                                *s = iq.q.pop_front().unwrap_or(0.0);
-                            }
-                            got = true;
-                        } else {
-                            iq.primed = false;
-                            sh.under.fetch_add(1, Relaxed);
+                    // trộn mọi điện thoại đang nối: mỗi máy có hàng đợi và bộ đệm riêng
+                    let srcs: Vec<Arc<Source>> = sh.sources.lock().clone();
+                    frame.iter_mut().for_each(|s| *s = 0.0);
+                    let (mut n, mut max_buf) = (0usize, 0usize);
+                    for src in &srcs {
+                        let mut iq = src.q.lock();
+                        if !iq.primed && iq.q.len() >= target {
+                            iq.primed = true;
                         }
+                        if iq.primed {
+                            if iq.q.len() >= FRAME {
+                                let muted = src.muted.load(Relaxed);
+                                for s in frame.iter_mut() {
+                                    let v = iq.q.pop_front().unwrap_or(0.0);
+                                    if !muted {
+                                        *s += v;
+                                    }
+                                }
+                                n += 1;
+                            } else {
+                                iq.primed = false;
+                                sh.under.fetch_add(1, Relaxed);
+                            }
+                        }
+                        max_buf = max_buf.max(iq.q.len());
                     }
-                    sh.buf_ms.store((iq.q.len() as f32 * 1000.0 / SR) as u32, Relaxed);
+                    if n > 1 {
+                        // nhiều người cùng nói: giảm mỗi máy theo căn bậc hai để khỏi vỡ tiếng
+                        let g = 1.0 / (n as f32).sqrt();
+                        frame.iter_mut().for_each(|s| *s *= g);
+                    }
+                    got = n > 0;
+                    sh.buf_ms.store((max_buf as f32 * 1000.0 / SR) as u32, Relaxed);
                 }
 
                 if !got {

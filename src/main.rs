@@ -152,7 +152,12 @@ fn set_mute(sh: &engine::Shared, to: Option<bool>) {
 /// Chữ hiện khi rê chuột lên icon ở khay.
 fn tray_tip(sh: &engine::Shared) -> String {
     let mut s = format!("LarmaMic v{}\n", env!("CARGO_PKG_VERSION"));
-    s.push_str(&i18n::t(if sh.connected.load(Relaxed) { "status.connected" } else { "status.waiting" }));
+    let n = sh.sources.lock().len();
+    s.push_str(&match n {
+        0 => i18n::t("status.waiting"),
+        1 => i18n::t("status.connected"),
+        n => i18n::tf("status.many", &[&n.to_string()]),
+    });
     if sh.params.read().mute {
         s.push_str(&i18n::t("tip.muted"));
     }

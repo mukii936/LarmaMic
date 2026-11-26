@@ -12,8 +12,8 @@ android {
         applicationId = "app.larmamic"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.4.0"
+        versionCode = 2
+        versionName = "0.5.0"
         resourceConfigurations += listOf("en", "vi", "zh", "ja", "ko", "in", "es", "fr", "de", "ru")
     }
 

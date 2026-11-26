@@ -367,13 +367,37 @@ impl App {
             ui.label(RichText::new(format!("LarmaMic v{}", env!("CARGO_PKG_VERSION"))).size(14.0).color(MUTE));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| self.language_picker(ui));
         });
-        let connected = self.sh.connected.load(Relaxed);
+        let sources: Vec<Arc<engine::Source>> = self.sh.sources.lock().clone();
+        let connected = !sources.is_empty();
         ui.horizontal(|ui| {
             let (rect, _) = ui.allocate_exact_size(vec2(14.0, 30.0), Sense::hover());
             ui.painter().circle_filled(rect.center(), 6.5, if connected { SIG } else { GHOST });
-            let txt = if connected { t("status.connected") } else { t("status.waiting") };
+            let txt = match sources.len() {
+                0 => t("status.waiting"),
+                1 => t("status.connected"),
+                n => tf("status.many", &[&n.to_string()]),
+            };
             ui.label(RichText::new(txt).size(22.0).strong().color(if connected { SIG } else { INK }));
         });
+        // Danh sách các điện thoại đang nối: tên, mức tiếng, tắt tiếng riêng, ngắt
+        for s in &sources {
+            ui.horizontal(|ui| {
+                let name = s.name.lock().clone();
+                ui.label(RichText::new(name).size(14.0));
+                let peak = f32::from_bits(s.peak.load(Relaxed));
+                let level = ((20.0 * peak.max(1e-5).log10() + 60.0) / 60.0).clamp(0.0, 1.0);
+                let (rect, _) = ui.allocate_exact_size(vec2(50.0, 8.0), Sense::hover());
+                ui.painter().rect_filled(rect, 3.0, OFF);
+                ui.painter().rect_filled(egui::Rect::from_min_size(rect.min, vec2(rect.width() * level, rect.height())), 3.0, SIG);
+                let muted = s.muted.load(Relaxed);
+                if ui.selectable_label(muted, t("chip.mute")).clicked() {
+                    s.muted.store(!muted, Relaxed);
+                }
+                if ui.small_button("×").on_hover_text(t("src.kick")).clicked() {
+                    s.kicked.store(true, Relaxed);
+                }
+            });
+        }
         if let Some(e) = self.sh.server_err.lock().clone() {
             ui.colored_label(WARN, e);
         }
@@ -472,8 +496,7 @@ impl App {
                 if ui.button(t("pair.rotate")).on_hover_text(t("pair.rotate.hint")).clicked()
                 {
                     *self.sh.token.write() = settings::new_token();
-                    self.sh.conn_gen.fetch_add(1, Relaxed); // ngắt kết nối cũ
-                    self.sh.connected.store(false, Relaxed);
+                    self.sh.kick_all(); // ngắt mọi kết nối cũ
                     self.persist(true);
                 }
             });

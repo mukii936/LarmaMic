@@ -185,6 +185,9 @@ static VI: &[(&str, &str)] = &[
     // --- trạng thái kết nối
     ("status.connected", "Điện thoại đã kết nối"),
     ("status.waiting", "Đang chờ điện thoại"),
+    ("status.many", "{0} điện thoại đã kết nối"),
+    ("src.kick", "Ngắt điện thoại này"),
+    ("src.default", "Điện thoại {0}"),
     ("srv.starting", "Đang khởi động máy chủ…"),
     ("pair.scan", "Quét mã bằng điện thoại hoặc mở:"),
     ("pair.copy", "Chép địa chỉ"),
@@ -423,6 +426,9 @@ static EN: &[(&str, &str)] = &[
     // --- connection status
     ("status.connected", "Phone connected"),
     ("status.waiting", "Waiting for phone"),
+    ("status.many", "{0} phones connected"),
+    ("src.kick", "Disconnect this phone"),
+    ("src.default", "Phone {0}"),
     ("srv.starting", "Starting server…"),
     ("pair.scan", "Scan with your phone or open:"),
     ("pair.copy", "Copy address"),

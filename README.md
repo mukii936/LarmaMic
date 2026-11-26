@@ -15,7 +15,7 @@
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat&logo=windows&logoColor=white">
   <img alt="Languages" src="https://img.shields.io/badge/languages-10-38e0c8?style=flat">
   <a href="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml"><img alt="Build" src="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml/badge.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-0.4.0-946ce6?style=flat">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.5.0-946ce6?style=flat">
 
   <br><br>
 
@@ -28,6 +28,7 @@
 ## Features
 
 - Use an **iPhone** with nothing to install (scan the QR code and open the page in Safari), or the native **Android app** that keeps streaming with the screen off.
+- **Several phones at once** (up to 4, any mix of iPhone and Android): their voices are mixed into the one virtual microphone. The PC app lists each phone with its level and lets you mute or disconnect it. The mute switch and push-to-talk affect the whole mix.
 - Three ways to connect: **Wi-Fi**, **USB cable** (USB tethering) and **Bluetooth** (Bluetooth tethering). The QR code carries every address of the PC, and the phone tries them in turn.
 - Run a single portable `larma-mic.exe` (about 9 MB, no installer, no runtime). It sits in the system tray with ≈ 0% CPU and about 4 MB of RAM while hidden.
 - Clean the voice with a processing chain at 48 kHz: AI noise removal ([RNNoise](https://jmvalin.ca/demo/rnnoise/)), rumble filter, noise gate with 5 ms lookahead, 4-band equalizer, auto level (AGC), compressor, volume and a −3 dB limiter.
@@ -118,7 +119,8 @@ The Android app (`android/`) needs JDK 17 and the Android SDK (platform 35):
 
 ```powershell
 cd android
-.\gradlew.bat testDebugUnitTest assembleRelease   # appuild\outputspkeleasepp-release.apk
+.\gradlew.bat testDebugUnitTest assembleRelease   # appuild\outputspk
+eleasepp-release.apk
 ```
 
 The APK is signed with the debug key so it can be installed directly; it is not meant for the Play Store.
