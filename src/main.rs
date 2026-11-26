@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod adb;
+mod api;
 mod appmatch;
 mod adpcm;
 mod aec;
@@ -12,6 +13,7 @@ mod icon;
 mod room;
 mod server;
 mod soundboard;
+mod speech;
 mod settings;
 mod ui;
 mod update;
@@ -23,7 +25,7 @@ use global_hotkey::{GlobalHotKeyEvent, HotKeyState};
 use std::sync::atomic::Ordering::Relaxed;
 use std::sync::Arc;
 use std::time::Duration;
-use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem};
+use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem, Submenu};
 use tray_icon::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
 fn main() -> eframe::Result<()> {
@@ -62,6 +64,16 @@ fn main() -> eframe::Result<()> {
     shared.mix_loudest.store(saved.mix_loudest, Relaxed);
     shared.discovery.store(!saved.no_discovery, Relaxed);
     soundboard::load(&shared);
+    update::cleanup_old();
+    shared.pc_on.store(saved.pc_audio, Relaxed);
+    engine::store_f(&shared.pc_level, if saved.pc_level > 0.0 { saved.pc_level.min(100.0) } else { 50.0 });
+    shared.pc_duck.store(!saved.pc_no_duck, Relaxed);
+    shared.auto_buf.store(saved.auto_buf, Relaxed);
+    shared.welcomed.store(saved.welcomed, Relaxed);
+    shared.voice_hotkeys.store(saved.voice_hotkeys, Relaxed);
+    shared.api_on.store(saved.api_on, Relaxed);
+    *shared.tts_voice.lock() = saved.tts_voice.clone();
+    shared.tts_rate.store(saved.tts_rate.clamp(-5, 5), Relaxed);
     shared.auto_profile.store(saved.auto_profile, Relaxed);
     *shared.app_rules.lock() = saved.app_rules.clone();
     shared.update_check.store(!saved.no_update_check, Relaxed);
@@ -104,6 +116,21 @@ struct TrayIds {
     mute: MenuId,
     unmute: MenuId,
     quit: MenuId,
+    /// one entry per voice in `settings::VOICES`
+    voices: Vec<MenuId>,
+}
+
+/// Saves what the user changed from the phone or the tray and exits (also used after an update is installed).
+pub fn quit_now(sh: &engine::Shared) -> ! {
+    // đóng file ghi âm đang mở để không để lại file WAV dở dang
+    sh.rec_req.store(2, Relaxed);
+    std::thread::sleep(Duration::from_millis(250));
+    // giữ nguyên thiết bị đã lưu, chỉ cập nhật thông số và hồ sơ (điện thoại có thể vừa chỉnh)
+    let mut s = settings::load();
+    s.params = *sh.params.read();
+    s.profiles = sh.profiles.read().clone();
+    settings::save(&s);
+    std::process::exit(0);
 }
 
 /// Icon ở khay hệ thống: bấm trái để mở, bấm phải ra menu.
@@ -113,12 +140,18 @@ fn make_tray() -> Option<TrayIds> {
     let mute = MenuItem::new(i18n::t("tray.mute"), true, None);
     let unmute = MenuItem::new(i18n::t("tray.unmute"), true, None);
     let quit = MenuItem::new(i18n::t("tray.quit"), true, None);
+    let voice_items: Vec<MenuItem> = settings::VOICES.iter().map(|v| MenuItem::new(i18n::t(v.key), true, None)).collect();
+    let voices_menu = Submenu::new(i18n::t("tray.voices"), true);
+    for it in &voice_items {
+        voices_menu.append(it).ok()?;
+    }
     let menu = Menu::new();
     menu.append_items(&[
         &open,
         &PredefinedMenuItem::separator(),
         &mute,
         &unmute,
+        &voices_menu,
         &PredefinedMenuItem::separator(),
         &quit,
     ])
@@ -131,7 +164,13 @@ fn make_tray() -> Option<TrayIds> {
         .with_icon(icon)
         .build()
         .ok()?;
-    let ids = TrayIds { open: open.id().clone(), mute: mute.id().clone(), unmute: unmute.id().clone(), quit: quit.id().clone() };
+    let ids = TrayIds {
+        open: open.id().clone(),
+        mute: mute.id().clone(),
+        unmute: unmute.id().clone(),
+        quit: quit.id().clone(),
+        voices: voice_items.iter().map(|i| i.id().clone()).collect(),
+    };
     win::set_tip_handler(move |text| {
         match tray.set_tooltip(Some(text.to_string())) {
             Err(e) => win::log_line(&i18n::tf("tray.err.tip", &[&e.to_string()])),
@@ -150,6 +189,10 @@ fn make_tray() -> Option<TrayIds> {
         mute.set_text(i18n::t("tray.mute"));
         unmute.set_text(i18n::t("tray.unmute"));
         quit.set_text(i18n::t("tray.quit"));
+        voices_menu.set_text(i18n::t("tray.voices"));
+        for (it, v) in voice_items.iter().zip(settings::VOICES.iter()) {
+            it.set_text(i18n::t(v.key));
+        }
     });
     Some(ids)
 }
@@ -209,24 +252,25 @@ fn spawn_events(sh: Arc<engine::Shared>, ctx: egui::Context, ids: Option<TrayIds
                     } else if ev.id == ids.unmute {
                         set_mute(&sh, Some(false));
                     } else if ev.id == ids.quit {
-                        // đóng file ghi âm đang mở để không để lại file WAV dở dang
-                        sh.rec_req.store(2, Relaxed);
-                        std::thread::sleep(Duration::from_millis(250));
-                        // giữ nguyên thiết bị đã lưu, chỉ cập nhật thông số và hồ sơ (điện thoại có thể vừa chỉnh)
-                        let mut s = settings::load();
-                        s.params = *sh.params.read();
-                        s.profiles = sh.profiles.read().clone();
-                        settings::save(&s);
-                        std::process::exit(0);
+                        quit_now(&sh);
+                    } else if let Some(i) = ids.voices.iter().position(|id| *id == ev.id) {
+                        let cur = *sh.params.read();
+                        sh.set_params(settings::apply_voice(&cur, i));
+                        ctx.request_repaint();
                     }
                 }
             }
             while let Ok(ev) = GlobalHotKeyEvent::receiver().try_recv() {
                 if ev.state == HotKeyState::Pressed {
                     let sound = sh.sound_hk.lock().get(&ev.id).copied();
-                    match sound {
-                        Some(id) => soundboard::play(&sh, id),
-                        None => set_mute(&sh, None),
+                    let voice = sh.voice_hk.lock().get(&ev.id).copied();
+                    match (sound, voice) {
+                        (Some(id), _) => soundboard::play(&sh, id),
+                        (None, Some(i)) => {
+                            let cur = *sh.params.read();
+                            sh.set_params(settings::apply_voice(&cur, i));
+                        }
+                        (None, None) => set_mute(&sh, None),
                     }
                     ctx.request_repaint();
                 }

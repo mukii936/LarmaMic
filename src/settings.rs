@@ -34,6 +34,8 @@ pub struct Params {
     pub fx_chorus: f32, // nhân đôi giọng (chorus) 0..100 %
     pub fx_dist: f32,   // méo tiếng 0..100 %
     pub fx_band: u8,    // bộ lọc dải: 0 không, 1 điện thoại, 2 loa phóng thanh
+    pub deess: f32,     // giảm âm "s" chói 0..100 %
+    pub plosive: bool,  // lọc tiếng "bụp" khi nói chữ p, b
 }
 
 impl Default for Params {
@@ -65,6 +67,7 @@ impl Params {
         self.fx_chorus = c(self.fx_chorus, 0.0, 100.0);
         self.fx_dist = c(self.fx_dist, 0.0, 100.0);
         self.fx_band = self.fx_band.min(2);
+        self.deess = c(self.deess, 0.0, 100.0);
         self
     }
 }
@@ -81,7 +84,7 @@ pub fn preset(name: &str) -> Params {
     let base = Params {
         ai: true, ai_mix: 85.0, gate_on: true, thr: -52.0, depth: 40.0, hp: 100.0,
         low: -1.0, mud: -3.0, pres: 3.0, air: 1.0, comp: 40.0, gain: 6.0, buf_ms: 60.0,
-        mute: false, monitor: false, agc: false, aec: false, fx_pitch: 0.0, fx_reverb: 0.0, fx_robot: false, fx_echo: 0.0, fx_chorus: 0.0, fx_dist: 0.0, fx_band: 0,
+        mute: false, monitor: false, agc: false, aec: false, fx_pitch: 0.0, fx_reverb: 0.0, fx_robot: false, fx_echo: 0.0, fx_chorus: 0.0, fx_dist: 0.0, fx_band: 0, deess: 0.0, plosive: false,
     };
     match name {
         "game" => Params {
@@ -115,12 +118,59 @@ pub fn apply_preset(cur: &Params, name: &str) -> Params {
         fx_chorus: cur.fx_chorus,
         fx_dist: cur.fx_dist,
         fx_band: cur.fx_band,
+        deess: cur.deess,
+        plosive: cur.plosive,
         ..preset(name)
     }
 }
 
 pub fn matches_preset(p: &Params, name: &str) -> bool {
     apply_preset(p, name) == *p
+}
+
+/// Giọng đổi sẵn: ghép từ các hiệu ứng giọng (đổi tông, vang, robot, vọng, nhân đôi, méo, lọc dải).
+pub struct Voice {
+    pub key: &'static str,
+    pub pitch: f32,
+    pub reverb: f32,
+    pub robot: bool,
+    pub echo: f32,
+    pub chorus: f32,
+    pub dist: f32,
+    pub band: u8,
+}
+const fn voice(key: &'static str, pitch: f32, reverb: f32, robot: bool, echo: f32, chorus: f32, dist: f32, band: u8) -> Voice {
+    Voice { key, pitch, reverb, robot, echo, chorus, dist, band }
+}
+pub const VOICES: [Voice; 10] = [
+    voice("fx.none", 0.0, 0.0, false, 0.0, 0.0, 0.0, 0),
+    voice("fx.deep", -5.0, 0.0, false, 0.0, 0.0, 0.0, 0),
+    voice("fx.small", 7.0, 0.0, false, 0.0, 0.0, 0.0, 0),
+    voice("fx.robot", 0.0, 0.0, true, 0.0, 0.0, 0.0, 0),
+    voice("fx.ghost", -2.0, 65.0, false, 35.0, 0.0, 0.0, 0),
+    voice("fx.alien", 4.0, 20.0, true, 0.0, 40.0, 0.0, 0),
+    voice("fx.monster", -9.0, 25.0, false, 0.0, 0.0, 35.0, 0),
+    voice("fx.cave", 0.0, 85.0, false, 45.0, 0.0, 0.0, 0),
+    voice("fx.radio", 0.0, 0.0, false, 0.0, 0.0, 15.0, 1),
+    voice("fx.megaphone", 0.0, 0.0, false, 0.0, 0.0, 40.0, 2),
+];
+
+impl Voice {
+    pub fn is_on(&self, p: &Params) -> bool {
+        p.fx_pitch == self.pitch
+            && p.fx_reverb == self.reverb
+            && p.fx_robot == self.robot
+            && p.fx_echo == self.echo
+            && p.fx_chorus == self.chorus
+            && p.fx_dist == self.dist
+            && p.fx_band == self.band
+    }
+}
+
+/// Áp giọng số `i` (0 = giọng thường) lên thông số hiện tại.
+pub fn apply_voice(cur: &Params, i: usize) -> Params {
+    let Some(v) = VOICES.get(i) else { return *cur };
+    Params { fx_pitch: v.pitch, fx_reverb: v.reverb, fx_robot: v.robot, fx_echo: v.echo, fx_chorus: v.chorus, fx_dist: v.dist, fx_band: v.band, ..*cur }
 }
 
 /// Hồ sơ riêng do người dùng đặt tên.
@@ -169,6 +219,21 @@ pub struct Saved {
     pub app_rules: Vec<crate::appmatch::AppRule>,
     /// true = không kiểm tra bản mới trên GitHub.
     pub no_update_check: bool,
+    /// Đưa âm thanh PC đang phát (nhạc, video) vào mic, với mức 0..100 (0 = dùng 50) và có hạ nhỏ khi bạn nói hay không.
+    pub pc_audio: bool,
+    pub pc_level: f32,
+    pub pc_no_duck: bool,
+    /// Tự chỉnh bộ đệm chống giật theo đường truyền.
+    pub auto_buf: bool,
+    /// Đã xem hướng dẫn lần đầu.
+    pub welcomed: bool,
+    /// Ctrl+Alt+F1..F10 đổi giọng.
+    pub voice_hotkeys: bool,
+    /// Bật API điều khiển cục bộ (http://127.0.0.1) cho Stream Deck, OBS...
+    pub api_on: bool,
+    /// Giọng đọc của Windows dùng cho chữ thành tiếng ("" = mặc định) và tốc độ -5..5.
+    pub tts_voice: String,
+    pub tts_rate: i32,
     /// Khóa dịch của ghi chú về lần đọc cài đặt này (không lưu ra file), ví dụ "note.backup".
     #[serde(skip)]
     pub note: String,
@@ -367,6 +432,17 @@ mod tests {
         let p = apply_preset(&cur, "game");
         assert!(p.agc && p.fx_robot && p.fx_pitch == 5.0 && p.fx_reverb == 30.0);
         assert!(matches_preset(&p, "game"));
+    }
+
+    #[test]
+    fn voices_apply_and_are_recognised() {
+        let base = Params::default();
+        for (i, v) in VOICES.iter().enumerate() {
+            let p = apply_voice(&base, i);
+            assert!(v.is_on(&p), "voice {i}");
+            assert_eq!(p.thr, base.thr, "only the effects change");
+        }
+        assert_eq!(apply_voice(&base, 99), base);
     }
 
     #[test]

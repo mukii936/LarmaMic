@@ -245,6 +245,11 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                                 }
                             }
                             "stopsounds" => crate::soundboard::stop_all(&sh),
+                            "say" => {
+                                if let Some(text) = m.name {
+                                    crate::speech::say_async(sh.clone(), text);
+                                }
+                            }
                             "calibrate" => {
                                 sh.cal_req.store(true, Relaxed);
                             }
@@ -460,6 +465,9 @@ pub fn spawn(sh: Arc<Shared>) {
 
 async fn run(sh: Arc<Shared>) -> Result<(), String> {
     let _ = rustls::crypto::ring::default_provider().install_default();
+
+    // API de dieu khien cuc bo (127.0.0.1): tu bat/tat theo cai dat
+    tokio::spawn(crate::api::run(sh.clone()));
 
     let ip: IpAddr = local_ip_address::local_ip().map_err(|_| t("srv.err.noip"))?;
     let (cert, key) = load_or_make_cert(&ip.to_string())?;

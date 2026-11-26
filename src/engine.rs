@@ -11,7 +11,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, SampleFormat, SizedSample};
 use parking_lot::{Mutex, RwLock};
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicU64, AtomicU8, Ordering::Relaxed};
 use std::sync::{mpsc, Arc, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -105,6 +105,34 @@ pub struct Shared {
     /// Âm thanh PC đang phát (loopback, 48 kHz mono) làm tín hiệu tham chiếu cho khử vọng.
     pub ref_q: Queue,
     pub ref_on: AtomicBool,
+    /// Âm thanh PC (cùng nguồn loopback) để trộn vào mic: bật/tắt, mức 0..100 (bit của f32), hạ nhỏ khi bạn nói.
+    pub pc_q: Queue,
+    pub pc_on: AtomicBool,
+    pub pc_level: AtomicU32,
+    pub pc_duck: AtomicBool,
+    /// Tự chỉnh bộ đệm chống giật.
+    pub auto_buf: AtomicBool,
+    /// Phím Ctrl+Alt+F1..F10 đổi giọng: id phím -> số giọng.
+    pub voice_hotkeys: AtomicBool,
+    pub voice_hk: Mutex<std::collections::HashMap<u32, usize>>,
+    /// API điều khiển cục bộ: bật/tắt và cổng đang nghe (0 = chưa nghe).
+    pub api_on: AtomicBool,
+    pub api_port: AtomicU32,
+    /// Chữ thành tiếng (giọng đọc Windows): giọng, tốc độ, đang đọc, lỗi.
+    pub tts_voice: Mutex<String>,
+    pub tts_rate: AtomicI32,
+    pub tts_busy: AtomicBool,
+    pub tts_msg: Mutex<Option<String>>,
+    /// Thử mic: yêu cầu, trạng thái (0 rảnh, 1 đang thu, 2 đang phát lại, 3 lỗi), tiến độ 0..1, lỗi.
+    pub test_req: AtomicBool,
+    pub test_state: AtomicU8,
+    pub test_progress: AtomicU32,
+    pub test_msg: Mutex<Option<String>>,
+    /// Hướng dẫn lần đầu đã xem chưa.
+    pub welcomed: AtomicBool,
+    /// Tự tải bản mới: đang chạy, thông báo lỗi.
+    pub upd_busy: AtomicBool,
+    pub upd_msg: Mutex<Option<String>>,
     /// Lý do khử vọng không chạy được: None = ổn; Some("virtual") = loa mặc định là mic ảo; Some(khác) = lỗi mở loopback.
     pub aec_err: Mutex<Option<String>>,
     /// Điện thoại đang chờ được cho phép ghép nối.
@@ -227,6 +255,26 @@ impl Shared {
             buf_shown: AtomicU32::new(0),
             ref_q: Arc::new(Mutex::new(VecDeque::new())),
             ref_on: AtomicBool::new(false),
+            pc_q: Arc::new(Mutex::new(VecDeque::new())),
+            pc_on: AtomicBool::new(false),
+            pc_level: AtomicU32::new(50f32.to_bits()),
+            pc_duck: AtomicBool::new(true),
+            auto_buf: AtomicBool::new(false),
+            voice_hotkeys: AtomicBool::new(false),
+            voice_hk: Mutex::new(std::collections::HashMap::new()),
+            api_on: AtomicBool::new(false),
+            api_port: AtomicU32::new(0),
+            tts_voice: Mutex::new(String::new()),
+            tts_rate: AtomicI32::new(0),
+            tts_busy: AtomicBool::new(false),
+            tts_msg: Mutex::new(None),
+            test_req: AtomicBool::new(false),
+            test_state: AtomicU8::new(0),
+            test_progress: AtomicU32::new(0),
+            test_msg: Mutex::new(None),
+            welcomed: AtomicBool::new(true),
+            upd_busy: AtomicBool::new(false),
+            upd_msg: Mutex::new(None),
             aec_err: Mutex::new(None),
             pending: Mutex::new(Vec::new()),
             talk: tokio::sync::broadcast::channel(8).0,
@@ -426,6 +474,11 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
             let mut room_tick = 0u32;
             let mut room_bands = [-120f32; BANDS];
             let mut ref_tmp: Vec<f32> = Vec::with_capacity(4096);
+            let mut pc_active = false;
+            let mut pc_duck_g = 1.0f32;
+            let mut pc_hold = 0u32;
+            let mut test: Option<(Instant, Vec<f32>)> = None;
+            let mut autobuf = AutoBuf::new();
 
             loop {
                 let p = *sh.params.read();
@@ -473,6 +526,20 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                 if cal_done_at.is_some_and(|t| t.elapsed() > Duration::from_secs(8)) {
                     sh.cal_state.store(0, Relaxed);
                     cal_done_at = None;
+                }
+
+                if sh.test_req.swap(false, Relaxed) && test.is_none() {
+                    test = Some((Instant::now(), Vec::with_capacity(TEST_SAMPLES)));
+                    sh.test_state.store(1, Relaxed);
+                    store_f(&sh.test_progress, 0.0);
+                    *sh.test_msg.lock() = None;
+                }
+                // thu mà quá 15 giây không có âm thanh (không có điện thoại nối): báo lỗi
+                if test.as_ref().is_some_and(|(t0, _)| t0.elapsed() > Duration::from_secs(15)) {
+                    test = None;
+                    sh.test_state.store(3, Relaxed);
+                    *sh.test_msg.lock() = Some(t("test.err.nomic"));
+                    sh.wake_ui();
                 }
 
                 // Chỉ chạy khi hàng đợi xuất còn dưới ~30 ms
@@ -558,6 +625,12 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                     frame.iter_mut().for_each(|s| *s = 0.0);
                     got = true;
                 }
+                // âm thanh PC đang phát vào mic mà chưa có điện thoại nào nối
+                let pc_run = sh.pc_on.load(Relaxed) && sh.ref_on.load(Relaxed);
+                if !got && room && pc_run && sh.pc_q.lock().len() >= FRAME {
+                    frame.iter_mut().for_each(|s| *s = 0.0);
+                    got = true;
+                }
 
                 if !got {
                     // Không có âm thanh: đo mức rơi dần về im lặng, đẩy im lặng ra thiết bị
@@ -568,7 +641,7 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                         store_f(&sh.out_db, -99.0);
                     }
                     // Có điện thoại nối thì thức dậy dày để bắt kịp gói; chưa có thì ngủ lâu cho đỡ tốn điện
-                    let busy = sh.connected.load(Relaxed) || cal.is_some();
+                    let busy = sh.connected.load(Relaxed) || cal.is_some() || pc_run;
                     std::thread::sleep(Duration::from_millis(if busy { 3 } else { 30 }));
                     continue;
                 }
@@ -633,6 +706,56 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                 let info = chain.process(&frame, &p, &mut out);
                 let mut sound_peak = 0f32;
 
+                // bộ đệm tự động: tăng khi bị giật, giảm dần khi ổn định
+                if sh.auto_buf.load(Relaxed) && sh.connected.load(Relaxed) {
+                    if let Some(v) = autobuf.step(now_ms() as f64 / 1000.0, sh.under.load(Relaxed), p.buf_ms) {
+                        let mut np = *sh.params.read();
+                        np.buf_ms = v;
+                        sh.set_params(np);
+                        sh.wake_ui();
+                    }
+                } else {
+                    autobuf.reset();
+                }
+
+                // âm thanh PC (nhạc, video) trộn vào mic, hạ nhỏ khi bạn đang nói
+                if pc_run {
+                    if !pc_active {
+                        sh.pc_q.lock().clear();
+                        pc_active = true;
+                    }
+                    let mut pc = [0f32; FRAME];
+                    {
+                        let mut q = sh.pc_q.lock();
+                        while q.len() > FRAME * 12 {
+                            q.pop_front(); // giữ độ trễ dưới ~120 ms
+                        }
+                        for v in pc.iter_mut() {
+                            match q.pop_front() {
+                                Some(x) => *v = x,
+                                None => break,
+                            }
+                        }
+                    }
+                    let voice = info.gate_open && info.out_peak > 0.03;
+                    if voice {
+                        pc_hold = 40; // giữ nhỏ thêm ~0,4 giây sau khi bạn ngừng nói
+                    } else if pc_hold > 0 {
+                        pc_hold -= 1;
+                    }
+                    let duck_t = if sh.pc_duck.load(Relaxed) && pc_hold > 0 { 0.2 } else { 1.0 };
+                    pc_duck_g += (duck_t - pc_duck_g) * if duck_t < pc_duck_g { 0.25 } else { 0.03 };
+                    let g = load_f(&sh.pc_level) / 100.0 * pc_duck_g;
+                    for (o, m) in out.iter_mut().zip(&pc) {
+                        *o = (*o + *m * g).clamp(-0.98, 0.98);
+                        sound_peak = sound_peak.max(o.abs());
+                    }
+                } else if pc_active {
+                    pc_active = false;
+                    pc_duck_g = 1.0;
+                    sh.pc_q.lock().clear();
+                }
+
                 // soundboard: trộn các âm đang phát vào đầu ra (sau bộ lọc, để lọc ồn không nuốt hiệu ứng âm thanh)
                 {
                     let mut pl = sh.playing.lock();
@@ -648,14 +771,7 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                     }
                     if active {
                         let mut mix = [0f32; FRAME];
-                        for p in pl.iter_mut() {
-                            let end = (p.pos + FRAME).min(p.buf.len());
-                            for (m, v) in mix.iter_mut().zip(&p.buf[p.pos..end]) {
-                                *m += *v;
-                            }
-                            p.pos = end;
-                        }
-                        pl.retain(|p| p.pos < p.buf.len());
+                        pl.retain_mut(|p| p.mix_into(&mut mix));
                         for (o, m) in out.iter_mut().zip(&mix) {
                             *o = (*o + *m * volume).clamp(-0.98, 0.98);
                             sound_peak = sound_peak.max(o.abs());
@@ -664,6 +780,18 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                             drop(pl);
                             sh.wake_ui();
                         }
+                    }
+                }
+                // thử mic: giữ lại 5 giây đầu ra rồi phát lại qua loa
+                if let Some((_, buf)) = test.as_mut() {
+                    buf.extend_from_slice(&out);
+                    store_f(&sh.test_progress, (buf.len() as f32 / TEST_SAMPLES as f32).min(1.0));
+                    if buf.len() >= TEST_SAMPLES {
+                        if let Some((_, b)) = test.take() {
+                            sh.test_state.store(2, Relaxed);
+                            play_local(sh.clone(), b);
+                        }
+                        sh.wake_ui();
                     }
                 }
                 store_f(&sh.in_db, lin2db(info.in_peak));
@@ -781,6 +909,90 @@ fn push_q(q: &Queue, data: &[f32], rate: u32) {
     if q.len() > cap {
         let cut = q.len() - cap;
         q.drain(..cut);
+    }
+}
+
+/// Thử mic: 5 giây.
+const TEST_SAMPLES: usize = 48_000 * 5;
+
+/// Phát một đoạn 48 kHz mono ra loa/tai nghe mặc định (không qua mic ảo) rồi đóng luồng.
+fn play_local(sh: Arc<Shared>, samples: Vec<f32>) {
+    let _ = std::thread::Builder::new().name("test-play".into()).spawn(move || {
+        let fail = |sh: &Shared, msg: String| {
+            *sh.test_msg.lock() = Some(msg);
+            sh.test_state.store(3, Relaxed);
+            sh.wake_ui();
+        };
+        let host = cpal::default_host();
+        let Some(dev) = host.default_output_device() else {
+            return fail(&sh, t("test.err.nodev"));
+        };
+        if dev.name().map(|n| is_virtual(&n)).unwrap_or(false) {
+            return fail(&sh, t("test.err.virtual"));
+        }
+        let q: Queue = Arc::new(Mutex::new(VecDeque::new()));
+        let (stream, rate) = match open(&dev, q.clone()) {
+            Ok(x) => x,
+            Err(e) => return fail(&sh, e),
+        };
+        let mut rs = Resampler::new(48_000, rate);
+        let mut conv = Vec::with_capacity(samples.len() * rate as usize / 48_000 + 64);
+        rs.process(&samples, &mut conv);
+        let secs = conv.len() as f32 / rate as f32;
+        q.lock().extend(conv);
+        std::thread::sleep(Duration::from_secs_f32(secs + 0.5));
+        drop(stream);
+        sh.test_state.store(0, Relaxed);
+        sh.wake_ui();
+    });
+}
+
+/// Tự chỉnh bộ đệm chống giật: bị giật thì tăng ngay, ổn định lâu thì hạ từ từ để bớt trễ.
+pub struct AutoBuf {
+    last_under: u32,
+    last_change: f64,
+    last_check: f64,
+}
+
+impl AutoBuf {
+    pub const MIN: f32 = 40.0;
+    pub const MAX: f32 = 300.0;
+
+    pub fn new() -> Self {
+        Self { last_under: 0, last_change: 0.0, last_check: 0.0 }
+    }
+
+    pub fn reset(&mut self) {
+        self.last_check = 0.0;
+    }
+
+    /// `now` tính bằng giây, `under` là số lần hết dữ liệu từ lúc điện thoại nối. Trả về bộ đệm mới nếu cần đổi.
+    pub fn step(&mut self, now: f64, under: u32, cur: f32) -> Option<f32> {
+        if self.last_check == 0.0 {
+            self.last_check = now;
+            self.last_change = now;
+            self.last_under = under;
+            return None;
+        }
+        if now - self.last_check < 1.0 {
+            return None;
+        }
+        self.last_check = now;
+        if under < self.last_under {
+            self.last_under = under; // bộ đếm được đặt lại khi có điện thoại mới nối
+        }
+        if under > self.last_under {
+            self.last_under = under;
+            self.last_change = now;
+            let v = (cur + 20.0).min(Self::MAX);
+            return (v > cur).then_some(v);
+        }
+        if now - self.last_change >= 30.0 {
+            self.last_change = now;
+            let v = (cur - 5.0).max(Self::MIN);
+            return (v < cur).then_some(v);
+        }
+        None
     }
 }
 
@@ -909,7 +1121,7 @@ fn find_device(host: &cpal::Host, name: &str) -> Option<cpal::Device> {
 
 /// cpal::Stream không chuyển luồng được trên Windows, nên một luồng riêng giữ chúng.
 /// Opens the default playback device in loopback mode (what the PC plays) and feeds `q` with 48 kHz mono samples.
-fn open_loopback(dev: &cpal::Device, q: Queue) -> Result<cpal::Stream, String> {
+fn open_loopback(dev: &cpal::Device, qs: Vec<Queue>) -> Result<cpal::Stream, String> {
     let cfg = dev.default_output_config().map_err(|e| e.to_string())?;
     let rate = cfg.sample_rate().0;
     let ch = cfg.channels() as usize;
@@ -932,10 +1144,12 @@ fn open_loopback(dev: &cpal::Device, q: Queue) -> Result<cpal::Stream, String> {
                     } else {
                         rs.process(&mono, &mut conv);
                     }
-                    let mut g = q.lock();
-                    g.extend(conv.iter().copied());
-                    while g.len() > 96_000 {
-                        g.pop_front(); // keep at most 2 s
+                    for q in &qs {
+                        let mut g = q.lock();
+                        g.extend(conv.iter().copied());
+                        while g.len() > 96_000 {
+                            g.pop_front(); // keep at most 2 s
+                        }
                     }
                 },
                 err,
@@ -961,7 +1175,7 @@ pub fn spawn_aec_reference(sh: Arc<Shared>) {
         let mut stream: Option<cpal::Stream> = None;
         let mut cur = String::new();
         loop {
-            let want = sh.params.read().aec;
+            let want = sh.params.read().aec || sh.pc_on.load(Relaxed);
             let name = if want { host.default_output_device().and_then(|d| d.name().ok()).unwrap_or_default() } else { String::new() };
             let usable = want && !name.is_empty() && !is_virtual(&name);
             if stream.is_some() && (!usable || name != cur) {
@@ -973,7 +1187,7 @@ pub fn spawn_aec_reference(sh: Arc<Shared>) {
             if want && !name.is_empty() && is_virtual(&name) {
                 *sh.aec_err.lock() = Some("virtual".to_string());
             } else if usable && stream.is_none() {
-                match host.default_output_device().ok_or_else(|| "no device".to_string()).and_then(|d| open_loopback(&d, sh.ref_q.clone())) {
+                match host.default_output_device().ok_or_else(|| "no device".to_string()).and_then(|d| open_loopback(&d, vec![sh.ref_q.clone(), sh.pc_q.clone()])) {
                     Ok(s) => {
                         if std::env::var_os("LARMA_DEBUG").is_some() {
                             crate::win::log_line(&format!("echo cancellation reference opened on: {name}"));
@@ -1043,6 +1257,43 @@ pub fn spawn_audio_manager(sh: Arc<Shared>) -> mpsc::Sender<Cmd> {
         })
         .expect("could not spawn the audio thread");
     tx
+}
+
+#[cfg(test)]
+mod autobuf_tests {
+    use super::*;
+
+    #[test]
+    fn grows_on_glitches_and_shrinks_when_calm() {
+        let mut a = AutoBuf::new();
+        let mut buf = 60.0f32;
+        let mut under = 0u32;
+        assert_eq!(a.step(10.0, under, buf), None); // first call only starts the clock
+        under += 1;
+        buf = a.step(12.0, under, buf).expect("glitch grows the buffer");
+        assert_eq!(buf, 80.0);
+        // calm for 31 s: one small step down, not before
+        assert_eq!(a.step(30.0, under, buf), None);
+        buf = a.step(43.0, under, buf).expect("calm shrinks it");
+        assert_eq!(buf, 75.0);
+        // never beyond the limits
+        for i in 0..40 {
+            under += 1;
+            if let Some(v) = a.step(100.0 + i as f64 * 2.0, under, buf) {
+                buf = v;
+            }
+        }
+        assert_eq!(buf, AutoBuf::MAX);
+        let mut low = 41.0f32;
+        let mut t = 1000.0;
+        for _ in 0..10 {
+            t += 31.0;
+            if let Some(v) = a.step(t, under, low) {
+                low = v;
+            }
+        }
+        assert_eq!(low, AutoBuf::MIN);
+    }
 }
 
 #[cfg(test)]

@@ -15,12 +15,44 @@ pub const MAX_SOUNDS: usize = 60;
 const MAX_SECONDS: usize = 60;
 const EXTS: [&str; 5] = ["mp3", "wav", "ogg", "flac", "oga"];
 
-#[derive(Clone, Serialize, Deserialize)]
+fn one() -> f32 {
+    1.0
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Sound {
     pub id: u32,
     pub name: String,
     /// File name inside the sounds folder.
     pub file: String,
+    /// Optional group ("Memes", "Greetings"...) for the filter chips; empty = none.
+    #[serde(default)]
+    pub group: String,
+    /// This sound's own loudness, 0..2 (1 = as decoded).
+    #[serde(default = "one")]
+    pub vol: f32,
+    /// Plays again and again until stopped (press it again or "Stop all").
+    #[serde(default)]
+    pub looping: bool,
+    /// Trim in seconds: start of the part that is played and its end (0 = until the end of the file).
+    #[serde(default)]
+    pub start: f32,
+    #[serde(default)]
+    pub end: f32,
+}
+
+impl Sound {
+    pub fn new(id: u32, name: String, file: String) -> Self {
+        Sound { id, name, file, group: String::new(), vol: 1.0, looping: false, start: 0.0, end: 0.0 }
+    }
+
+    /// (first sample, last sample + 1) to play inside a decoded buffer of `len` samples; always at least 10 ms.
+    pub fn range(&self, len: usize) -> (usize, usize) {
+        let to = |s: f32| (s.max(0.0) * 48_000.0) as usize;
+        let start = to(self.start).min(len.saturating_sub(480));
+        let end = if self.end > 0.0 { to(self.end).min(len) } else { len };
+        (start, end.max(start + 480).min(len.max(start + 480)))
+    }
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -40,8 +72,41 @@ pub struct Board {
 
 /// A sound that is playing right now.
 pub struct Playing {
+    /// Soundboard id (None = a spoken sentence), so a looping sound can be stopped by pressing it again.
+    pub id: Option<u32>,
     pub buf: Arc<Vec<f32>>,
     pub pos: usize,
+    pub start: usize,
+    pub end: usize,
+    pub vol: f32,
+    pub looping: bool,
+}
+
+impl Playing {
+    /// Adds the next `out.len()` samples of this sound (times its volume) to `out`; false when it has ended.
+    pub fn mix_into(&mut self, out: &mut [f32]) -> bool {
+        let mut n = 0;
+        while n < out.len() {
+            if self.pos >= self.end {
+                if self.looping && self.end > self.start {
+                    self.pos = self.start;
+                } else {
+                    break;
+                }
+            }
+            let take = (out.len() - n).min(self.end - self.pos).min(self.buf.len().saturating_sub(self.pos));
+            if take == 0 {
+                self.pos = self.end;
+                break;
+            }
+            for (o, v) in out[n..n + take].iter_mut().zip(&self.buf[self.pos..self.pos + take]) {
+                *o += *v * self.vol;
+            }
+            self.pos += take;
+            n += take;
+        }
+        self.looping || self.pos < self.end
+    }
 }
 
 pub fn dir() -> PathBuf {
@@ -177,7 +242,7 @@ pub fn add_file(sh: &Arc<Shared>, src: &Path, name: Option<&str>) -> Result<(), 
         let mut b = sh.board.lock();
         let id = b.next_id.max(1);
         b.next_id = id + 1;
-        b.sounds.push(Sound { id, name: display, file });
+        b.sounds.push(Sound::new(id, display, file));
         b.cache.insert(id, Arc::new(samples));
     }
     save(sh);
@@ -268,13 +333,128 @@ pub fn play(sh: &Arc<Shared>, id: u32) {
         },
         _ => return,
     };
+    let snd = sh.board.lock().sounds.iter().find(|s| s.id == id).cloned();
+    let Some(snd) = snd else { return };
     let mut pl = sh.playing.lock();
+    // pressing a looping sound again stops it
+    if snd.looping && pl.iter().any(|p| p.id == Some(id)) {
+        pl.retain(|p| p.id != Some(id));
+        drop(pl);
+        sh.wake_ui();
+        return;
+    }
     if pl.len() >= 16 {
         pl.remove(0);
     }
-    pl.push(Playing { buf, pos: 0 });
+    let (start, end) = snd.range(buf.len());
+    pl.push(Playing { id: Some(id), buf, pos: start, start, end, vol: snd.vol.clamp(0.0, 2.0), looping: snd.looping });
     drop(pl);
     sh.wake_ui();
+}
+
+/// Settings of one sound changed in the UI (name, group, volume, loop, trim): saved by the caller with `save`.
+pub fn update(sh: &Shared, snd: &Sound) {
+    let mut b = sh.board.lock();
+    if let Some(s) = b.sounds.iter_mut().find(|s| s.id == snd.id) {
+        *s = snd.clone();
+    }
+}
+
+/// What importing a backup folder would add: the sounds of `src` whose audio file exists (`has_file`), with fresh ids.
+pub fn plan_import(have: &[Sound], src: &[Sound], next_id: u32, has_file: impl Fn(&str) -> bool) -> Vec<Sound> {
+    let mut id = next_id.max(1);
+    let mut out = Vec::new();
+    for s in src {
+        if !has_file(&s.file) || have.iter().any(|h| h.file == s.file) {
+            continue;
+        }
+        let mut n = s.clone();
+        n.id = id;
+        id += 1;
+        out.push(n);
+    }
+    out
+}
+
+/// Copies the soundboard (index + audio files) into `dst`, a folder the user can keep or move to another PC.
+pub fn export_to(sh: &Shared, dst: &Path) -> Result<usize, String> {
+    let b = sh.board.lock();
+    std::fs::create_dir_all(dst.join("sounds")).map_err(|e| e.to_string())?;
+    let text = serde_json::to_string_pretty(&*b).map_err(|e| e.to_string())?;
+    std::fs::write(dst.join("sounds.json"), text).map_err(|e| e.to_string())?;
+    let mut n = 0;
+    for s in &b.sounds {
+        if std::fs::copy(dir().join(&s.file), dst.join("sounds").join(&s.file)).is_ok() {
+            n += 1;
+        }
+    }
+    Ok(n)
+}
+
+/// Adds the sounds found in a folder made by `export_to`. Returns how many were added.
+pub fn import_from(sh: &Arc<Shared>, src: &Path) -> Result<usize, String> {
+    let text = std::fs::read_to_string(src.join("sounds.json")).map_err(|_| crate::i18n::t("board.err.import"))?;
+    let theirs: Board = serde_json::from_str(&text).map_err(|_| crate::i18n::t("board.err.import"))?;
+    let (have, next) = {
+        let b = sh.board.lock();
+        (b.sounds.clone(), b.next_id)
+    };
+    let room = MAX_SOUNDS.saturating_sub(have.len());
+    let mut plan = plan_import(&have, &theirs.sounds, next, |f| src.join("sounds").join(f).is_file() && !f.contains(['/', '\\']));
+    plan.truncate(room);
+    std::fs::create_dir_all(dir()).map_err(|e| e.to_string())?;
+    let mut added = Vec::new();
+    for s in plan {
+        if std::fs::copy(src.join("sounds").join(&s.file), dir().join(&s.file)).is_ok() {
+            added.push(s);
+        }
+    }
+    let n = added.len();
+    {
+        let mut b = sh.board.lock();
+        for s in added {
+            b.next_id = b.next_id.max(s.id + 1);
+            b.sounds.push(s);
+        }
+    }
+    save(sh);
+    Ok(n)
+}
+
+/// Folder dialog (PowerShell) -> path, or None if cancelled.
+pub fn pick_folder() -> Option<PathBuf> {
+    let script = "Add-Type -AssemblyName System.Windows.Forms;$d=New-Object System.Windows.Forms.FolderBrowserDialog;\
+                  if($d.ShowDialog() -eq 'OK'){[Console]::Out.WriteLine($d.SelectedPath)}";
+    let o = Command::new("powershell").args(["-NoProfile", "-STA", "-NonInteractive", "-Command", script]).creation_flags(0x0800_0000).output().ok()?;
+    let p = String::from_utf8_lossy(&o.stdout).trim().to_string();
+    (!p.is_empty()).then(|| PathBuf::from(p))
+}
+
+pub fn export_async(sh: Arc<Shared>) {
+    let _ = std::thread::Builder::new().name("board-export".into()).spawn(move || {
+        if let Some(p) = pick_folder() {
+            let dst = p.join("LarmaMic-soundboard");
+            *sh.board_msg.lock() = match export_to(&sh, &dst) {
+                Ok(n) => Some(crate::i18n::tf("board.exported", &[&n.to_string(), &dst.display().to_string()])),
+                Err(e) => Some(e),
+            };
+            sh.wake_ui();
+        }
+    });
+}
+
+pub fn import_async(sh: Arc<Shared>) {
+    let _ = std::thread::Builder::new().name("board-import".into()).spawn(move || {
+        if let Some(p) = pick_folder() {
+            // accept either the exported folder itself or the folder that contains it
+            let src = if p.join("sounds.json").is_file() { p.clone() } else { p.join("LarmaMic-soundboard") };
+            *sh.board_msg.lock() = match import_from(&sh, &src) {
+                Ok(n) => Some(crate::i18n::tf("board.imported", &[&n.to_string()])),
+                Err(e) => Some(e),
+            };
+            sh.wake_ui();
+        }
+    });
 }
 
 pub fn stop_all(sh: &Shared) {
@@ -366,6 +546,61 @@ mod tests {
         assert!((v.len() as i64 - 24_000).abs() < 400, "len {}", v.len());
         let peak = v.iter().fold(0f32, |m, x| m.max(x.abs()));
         assert!((peak - 0.9).abs() < 0.05, "peak {peak}");
+    }
+
+    #[test]
+    fn trim_range_is_always_valid() {
+        let mut s = Sound::new(1, "a".into(), "a.wav".into());
+        assert_eq!(s.range(48_000), (0, 48_000));
+        s.start = 0.25;
+        s.end = 0.5;
+        assert_eq!(s.range(48_000), (12_000, 24_000));
+        s.start = 5.0; // past the end of a 1 s sound
+        s.end = 1.0;
+        let (a, b) = s.range(48_000);
+        assert!(a < b && b <= 48_000, "{a} {b}");
+        s.start = 0.5;
+        s.end = 0.4; // end before start
+        let (a, b) = s.range(48_000);
+        assert!(b > a);
+    }
+
+    #[test]
+    fn playing_loops_and_ends() {
+        let buf = Arc::new((0..1000).map(|i| i as f32).collect::<Vec<f32>>());
+        let mut p = Playing { id: Some(1), buf: buf.clone(), pos: 100, start: 100, end: 600, vol: 0.5, looping: false };
+        let mut out = [0f32; 400];
+        assert!(p.mix_into(&mut out));
+        assert_eq!(out[0], 50.0);
+        let mut out2 = [0f32; 400];
+        assert!(!p.mix_into(&mut out2), "ended after its 500 samples");
+        assert_eq!(out2[99], 0.5 * 599.0);
+        assert_eq!(out2[100], 0.0);
+        let mut l = Playing { id: Some(1), buf, pos: 100, start: 100, end: 600, vol: 1.0, looping: true };
+        let mut out = [0f32; 700];
+        assert!(l.mix_into(&mut out));
+        assert_eq!(out[500], 100.0, "wrapped to the start");
+    }
+
+    #[test]
+    fn import_skips_duplicates_and_missing_files() {
+        let have = vec![Sound::new(1, "a".into(), "a.mp3".into())];
+        let src = vec![
+            Sound::new(7, "a again".into(), "a.mp3".into()),
+            Sound::new(8, "b".into(), "b.mp3".into()),
+            Sound::new(9, "gone".into(), "gone.mp3".into()),
+        ];
+        let plan = plan_import(&have, &src, 2, |f| f != "gone.mp3");
+        assert_eq!(plan.len(), 1);
+        assert_eq!((plan[0].id, plan[0].name.as_str()), (2, "b"));
+    }
+
+    #[test]
+    fn old_index_files_still_load() {
+        let old = r#"{"sounds":[{"id":3,"name":"Honk","file":"honk-1.mp3"}],"next_id":4,"volume":0.8,"duck":true,"hotkeys":false}"#;
+        let b: Board = serde_json::from_str(old).unwrap();
+        assert_eq!(b.sounds[0].vol, 1.0);
+        assert!(!b.sounds[0].looping && b.sounds[0].group.is_empty());
     }
 
     #[test]

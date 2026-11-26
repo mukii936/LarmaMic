@@ -40,6 +40,14 @@
 - **Per-app profiles:** switch to a preset or saved profile while a program such as Discord or a game is running, and go back when it closes.
 - **Tabs** (Connect, Sound, Soundboard, Settings) keep the desktop app tidy.
 - **Update notice:** the app can tell you when a new release is on GitHub (one small request at startup and every six hours, no personal data; can be turned off in Settings). It never installs anything by itself.
+- **PC audio in the mic:** mix what the PC plays (music, a video) into your voice, lowered automatically while you talk, for sharing a song or a clip with friends.
+- **Type to speak:** type a sentence and a Windows voice says it into the microphone (voice and speed selectable).
+- **Test my mic:** record 5 seconds and hear them back through your speakers, exactly as other people will hear you.
+- **Voice hotkeys and tray menu:** `Ctrl+Alt+F1…F10` or the tray icon switch between the ten voices while you play.
+- **De-esser and plosive filter** soften harsh "s" sounds and "p"/"b" pops; **auto buffer** raises the buffer when audio stutters and lowers it when the connection is calm.
+- **Soundboard extras:** search, groups, per-sound volume, loop, start/end trim, and backup or restore of the whole board.
+- **Local control API** (off by default): `http://127.0.0.1:PORT/api/mute?on=1&k=CODE`, `voice?n=3`, `play?name=Airhorn`, `say?text=Hello`… for Stream Deck, OBS or AutoHotkey. It listens on this PC only and needs your pairing code.
+- **First-run guide** checks for a virtual microphone (VB-Cable or Steam) and shows the three steps; **Install now** in the update banner downloads the release, verifies its SHA-256 against the published `SHA256.txt` and restarts.
 - Three ways to connect: **Wi-Fi**, **USB cable** (USB tethering) and **Bluetooth** (Bluetooth tethering). The QR code carries every address of the PC, and the phone tries them in turn.
 - Run a single portable `larma-mic.exe` (about 9 MB, no installer, no runtime). It sits in the system tray with ≈ 0% CPU and about 4 MB of RAM while hidden.
 - Clean the voice with a processing chain at 48 kHz: AI noise removal ([RNNoise](https://jmvalin.ca/demo/rnnoise/)), rumble filter, noise gate with 5 ms lookahead, 4-band equalizer, auto level (AGC), compressor, volume and a −3 dB limiter.

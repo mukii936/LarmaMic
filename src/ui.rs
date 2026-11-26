@@ -183,6 +183,22 @@ pub struct App {
     last_board_ver: u64,
     /// Ô chọn ngôn ngữ đang mở: đã nạp tạm font CJK để hiện tên các ngôn ngữ.
     menu_fonts: bool,
+    board_search: String,
+    board_group: String,
+    edit_sound: Option<u32>,
+    tts_text: String,
+    tts_voices: Arc<parking_lot::Mutex<Option<Vec<String>>>>,
+    tts_loading: bool,
+    voice_keys: Vec<HotKey>,
+    voice_hk_applied: bool,
+    voice_hk_failed: u32,
+    api_copied: Option<Instant>,
+}
+
+/// Mở một địa chỉ web bằng trình duyệt mặc định.
+fn open_url(url: &str) {
+    use std::os::windows::process::CommandExt;
+    let _ = std::process::Command::new("cmd").args(["/c", "start", "", url]).creation_flags(0x0800_0000).spawn();
 }
 
 /// Các phím tắt cho người dùng chọn: (chuỗi đăng ký, tên hiển thị). "off" được dịch riêng.
@@ -320,6 +336,222 @@ impl App {
         ui.add_space(10.0);
     }
 
+    /// Đưa âm thanh PC đang phát (nhạc, video) vào mic, hạ nhỏ khi bạn nói.
+    fn pc_card(&mut self, ui: &mut Ui) {
+        let sh = self.sh.clone();
+        let mut on = sh.pc_on.load(Relaxed);
+        let mut duck = sh.pc_duck.load(Relaxed);
+        let mut level = load_f(&sh.pc_level);
+        let mut changed = false;
+        egui::Frame::default().fill(OFF).corner_radius(10.0).inner_margin(12.0).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new(t("pc.title")).strong());
+                changed |= ui.checkbox(&mut on, t("pc.on")).on_hover_text(t("pc.hint")).changed();
+            });
+            if on {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(t("pc.level"));
+                    changed |= ui.add(Slider::new(&mut level, 0.0..=100.0).suffix("%")).changed();
+                    changed |= ui.checkbox(&mut duck, t("pc.duck")).changed();
+                });
+                match sh.aec_err.lock().clone() {
+                    Some(e) if e == "virtual" => {
+                        ui.colored_label(WARN, t("pc.err.virtual"));
+                    }
+                    Some(e) => {
+                        ui.colored_label(WARN, tf("aec.err", &[&e]));
+                    }
+                    None => {}
+                }
+                ui.label(RichText::new(t("pc.note")).small().color(MUTE));
+            }
+        });
+        ui.add_space(8.0);
+        if changed {
+            sh.pc_on.store(on, Relaxed);
+            sh.pc_duck.store(duck, Relaxed);
+            engine::store_f(&sh.pc_level, level);
+            self.persist(true);
+        }
+    }
+
+    /// "Thử mic của tôi": thu 5 giây đầu ra đã xử lý rồi phát lại qua loa.
+    fn test_card(&mut self, ui: &mut Ui) {
+        let state = self.sh.test_state.load(Relaxed);
+        let connected = self.sh.connected.load(Relaxed);
+        egui::Frame::default().fill(OFF).corner_radius(10.0).inner_margin(12.0).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new(t("test.title")).strong());
+                match state {
+                    1 => {
+                        ui.label(RichText::new(t("test.recording")).color(SIG));
+                        ui.add(egui::ProgressBar::new(load_f(&self.sh.test_progress)).desired_width(160.0));
+                    }
+                    2 => {
+                        ui.label(RichText::new(t("test.playing")).color(SIG));
+                    }
+                    _ => {
+                        if ui.add_enabled(connected, egui::Button::new(t("test.btn"))).on_hover_text(t("test.hint")).clicked() {
+                            self.sh.test_state.store(1, Relaxed);
+                            self.sh.test_req.store(true, Relaxed);
+                        }
+                        if !connected {
+                            ui.label(RichText::new(t("test.need")).small().color(MUTE));
+                        }
+                    }
+                }
+            });
+            if state == 3 {
+                if let Some(m) = self.sh.test_msg.lock().clone() {
+                    ui.colored_label(WARN, m);
+                }
+            }
+        });
+        ui.add_space(8.0);
+    }
+
+    /// Đăng ký Ctrl+Alt+F1..F10 để đổi giọng (hoặc gỡ nếu tắt).
+    fn sync_voice_hotkeys(&mut self) {
+        if let Some(m) = &self.hk_mgr {
+            for hk in self.voice_keys.drain(..) {
+                let _ = m.unregister(hk);
+            }
+        }
+        self.sh.voice_hk.lock().clear();
+        self.voice_hk_failed = 0;
+        if !self.sh.voice_hotkeys.load(Relaxed) {
+            return;
+        }
+        let codes = [Code::F1, Code::F2, Code::F3, Code::F4, Code::F5, Code::F6, Code::F7, Code::F8, Code::F9, Code::F10];
+        if let Some(m) = &self.hk_mgr {
+            for (i, code) in codes.into_iter().enumerate() {
+                let hk = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), code);
+                if m.register(hk).is_ok() {
+                    self.sh.voice_hk.lock().insert(hk.id(), i);
+                    self.voice_keys.push(hk);
+                } else {
+                    self.voice_hk_failed += 1;
+                }
+            }
+        }
+    }
+
+    /// Chữ thành tiếng: gõ một câu, giọng đọc của Windows nói vào mic.
+    fn tts_card(&mut self, ui: &mut Ui) {
+        if !self.tts_loading {
+            self.tts_loading = true;
+            let cell = self.tts_voices.clone();
+            let sh = self.sh.clone();
+            let _ = std::thread::Builder::new().name("tts-voices".into()).spawn(move || {
+                *cell.lock() = Some(crate::speech::voices());
+                sh.wake_ui();
+            });
+        }
+        let sh = self.sh.clone();
+        let busy = sh.tts_busy.load(Relaxed);
+        let mut speak = false;
+        let mut changed = false;
+        egui::Frame::default().fill(OFF).corner_radius(10.0).inner_margin(12.0).show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.label(RichText::new(t("tts.title")).strong());
+            ui.horizontal_wrapped(|ui| {
+                let r = ui.add(egui::TextEdit::singleline(&mut self.tts_text).hint_text(t("tts.hint")).desired_width(380.0).char_limit(crate::speech::MAX_CHARS));
+                let enter = r.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                let can = !busy && !self.tts_text.trim().is_empty();
+                if ui.add_enabled(can, egui::Button::new(t("tts.btn"))).clicked() || (enter && can) {
+                    speak = true;
+                }
+                if busy {
+                    ui.label(RichText::new(t("tts.speaking")).small().color(SIG));
+                }
+            });
+            ui.horizontal_wrapped(|ui| {
+                let voices = self.tts_voices.lock().clone().unwrap_or_default();
+                let cur = sh.tts_voice.lock().clone();
+                egui::ComboBox::from_id_salt("tts_voice")
+                    .width(240.0)
+                    .selected_text(if cur.is_empty() { t("tts.default") } else { cur.clone() })
+                    .show_ui(ui, |ui| {
+                        if ui.selectable_label(cur.is_empty(), t("tts.default")).clicked() {
+                            sh.tts_voice.lock().clear();
+                            changed = true;
+                        }
+                        for v in &voices {
+                            if ui.selectable_label(*v == cur, v).clicked() {
+                                *sh.tts_voice.lock() = v.clone();
+                                changed = true;
+                            }
+                        }
+                    });
+                ui.label(t("tts.rate"));
+                let mut rate = sh.tts_rate.load(Relaxed);
+                if ui.add(Slider::new(&mut rate, -5..=5)).changed() {
+                    sh.tts_rate.store(rate, Relaxed);
+                    changed = true;
+                }
+            });
+            if let Some(e) = sh.tts_msg.lock().clone() {
+                ui.colored_label(WARN, e);
+            }
+        });
+        ui.add_space(8.0);
+        if speak {
+            crate::speech::say_async(self.sh.clone(), self.tts_text.trim().to_string());
+        }
+        if changed {
+            self.persist(true);
+        }
+    }
+
+    /// Hướng dẫn lần đầu: mic ảo, cách nối điện thoại, chọn mic trong Discord/game.
+    fn wizard(&mut self, ctx: &egui::Context) {
+        let virt = engine::find_virtual(&self.devices);
+        let mut done = false;
+        egui::Window::new(t("wiz.title"))
+            .collapsible(false)
+            .resizable(false)
+            .anchor(Align2::CENTER_CENTER, vec2(0.0, 0.0))
+            .default_width(480.0)
+            .show(ctx, |ui| {
+                ui.label(RichText::new(t("wiz.lead")).color(MUTE));
+                ui.add_space(8.0);
+                ui.label(RichText::new(t("wiz.s1")).strong());
+                match &virt {
+                    Some(name) => {
+                        ui.colored_label(SIG, tf("wiz.s1.ok", &[name]));
+                    }
+                    None => {
+                        ui.colored_label(WARN, t("wiz.s1.no"));
+                        ui.horizontal_wrapped(|ui| {
+                            if ui.button(t("wiz.get.cable")).clicked() {
+                                open_url("https://vb-audio.com/Cable/");
+                            }
+                            if ui.button(t("wiz.recheck")).clicked() {
+                                self.devices = engine::list_output_devices();
+                            }
+                        });
+                        ui.label(RichText::new(t("wiz.s1.steam")).small().color(MUTE));
+                    }
+                }
+                ui.add_space(8.0);
+                ui.label(RichText::new(t("wiz.s2")).strong());
+                ui.label(t("wiz.s2.text"));
+                ui.add_space(8.0);
+                ui.label(RichText::new(t("wiz.s3")).strong());
+                ui.label(tf("wiz.s3.text", &[if matches!(&virt, Some(n) if n.to_lowercase().contains("steam")) { "Steam Streaming Microphone" } else { "CABLE Output (VB-Audio Virtual Cable)" }]));
+                ui.add_space(10.0);
+                if ui.add(egui::Button::new(RichText::new(t("wiz.done")).color(ON_SIG)).fill(SIG)).clicked() {
+                    done = true;
+                }
+            });
+        if done {
+            self.sh.welcomed.store(true, Relaxed);
+            self.persist(true);
+        }
+    }
+
     /// Đăng ký Ctrl+Alt+1..9 cho chín âm đầu tiên (hoặc gỡ nếu tắt).
     fn sync_sound_hotkeys(&mut self) {
         if let Some(m) = &self.hk_mgr {
@@ -416,20 +648,55 @@ impl App {
         ui.separator();
         ui.add_space(8.0);
 
-        // lưới nút
+        // tìm kiếm và lọc theo nhóm
         let sounds: Vec<soundboard::Sound> = self.sh.board.lock().sounds.clone();
+        let mut groups: Vec<String> = sounds.iter().map(|s| s.group.clone()).filter(|g| !g.is_empty()).collect();
+        groups.sort_by_key(|g| g.to_lowercase());
+        groups.dedup();
+        if !groups.contains(&self.board_group) {
+            self.board_group.clear();
+        }
+        if sounds.len() > 6 || !groups.is_empty() {
+            ui.horizontal_wrapped(|ui| {
+                ui.add(egui::TextEdit::singleline(&mut self.board_search).hint_text(t("board.search")).desired_width(180.0));
+                if !groups.is_empty() {
+                    if ui.selectable_label(self.board_group.is_empty(), t("board.group.all")).clicked() {
+                        self.board_group.clear();
+                    }
+                    for g in &groups {
+                        if ui.selectable_label(self.board_group == *g, g).clicked() {
+                            self.board_group = g.clone();
+                        }
+                    }
+                }
+            });
+            ui.add_space(6.0);
+        }
+        let q = self.board_search.trim().to_lowercase();
+
+        // lưới nút
         if sounds.is_empty() {
             ui.label(RichText::new(t("board.empty")).color(MUTE));
         }
         let mut remove: Option<u32> = None;
+        let mut edit: Option<u32> = self.edit_sound;
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
             for (i, s) in sounds.iter().enumerate() {
-                let label = if i < 9 && hotkeys { format!("{}  ·  {}", i + 1, s.name) } else { s.name.clone() };
+                if (!q.is_empty() && !s.name.to_lowercase().contains(&q)) || (!self.board_group.is_empty() && s.group != self.board_group) {
+                    continue;
+                }
+                let mut label = if i < 9 && hotkeys { format!("{}  ·  {}", i + 1, s.name) } else { s.name.clone() };
+                if s.looping {
+                    label.push_str("  ∞");
+                }
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 2.0;
                     if ui.add(egui::Button::new(RichText::new(label).size(15.0)).min_size(vec2(130.0, 36.0))).clicked() {
                         soundboard::play(&self.sh, s.id);
+                    }
+                    if ui.small_button("…").on_hover_text(t("board.edit")).clicked() {
+                        edit = if edit == Some(s.id) { None } else { Some(s.id) };
                     }
                     if ui.small_button("×").on_hover_text(t("board.remove")).clicked() {
                         remove = Some(s.id);
@@ -437,9 +704,79 @@ impl App {
                 });
             }
         });
+        self.edit_sound = edit;
         if let Some(id) = remove {
+            if self.edit_sound == Some(id) {
+                self.edit_sound = None;
+            }
             soundboard::remove(&self.sh, id);
         }
+
+        // sửa âm đang chọn: tên, nhóm, âm lượng riêng, lặp, cắt đầu/đuôi
+        if let Some(id) = self.edit_sound {
+            if let Some(mut s) = sounds.iter().find(|s| s.id == id).cloned() {
+                let before = s.clone();
+                ui.add_space(10.0);
+                egui::Frame::default().fill(OFF).corner_radius(10.0).inner_margin(12.0).show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(t("board.edit.name"));
+                        ui.add(egui::TextEdit::singleline(&mut s.name).desired_width(160.0).char_limit(40));
+                        ui.label(t("board.edit.group"));
+                        ui.add(egui::TextEdit::singleline(&mut s.group).desired_width(120.0).char_limit(20));
+                    });
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(t("board.edit.vol"));
+                        ui.add(Slider::new(&mut s.vol, 0.0..=2.0).show_value(true));
+                        ui.checkbox(&mut s.looping, t("board.edit.loop"));
+                    });
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(t("board.edit.start"));
+                        ui.add(egui::DragValue::new(&mut s.start).range(0.0..=60.0).speed(0.05).suffix(" s"));
+                        ui.label(t("board.edit.end"));
+                        ui.add(egui::DragValue::new(&mut s.end).range(0.0..=60.0).speed(0.05).suffix(" s"));
+                        ui.label(RichText::new(t("board.edit.end.hint")).small().color(MUTE));
+                    });
+                    ui.horizontal(|ui| {
+                        if ui.button(t("board.edit.test")).clicked() {
+                            soundboard::update(&self.sh, &s);
+                            soundboard::play(&self.sh, s.id);
+                        }
+                        if ui.button(t("board.edit.close")).clicked() {
+                            self.edit_sound = None;
+                        }
+                    });
+                });
+                if s != before {
+                    s.name = s.name.chars().filter(|c| !c.is_control()).collect();
+                    if s.name.trim().is_empty() {
+                        s.name = before.name.clone();
+                    }
+                    soundboard::update(&self.sh, &s);
+                    if !ui.ctx().input(|i| i.pointer.any_down()) {
+                        soundboard::save(&self.sh);
+                    }
+                } else if ui.ctx().input(|i| i.pointer.any_released()) {
+                    soundboard::save(&self.sh);
+                }
+            }
+        }
+
+        // chữ thành tiếng
+        ui.add_space(14.0);
+        self.tts_card(ui);
+
+        // sao lưu / chuyển sang máy khác
+        ui.add_space(14.0);
+        ui.horizontal_wrapped(|ui| {
+            if ui.button(t("board.export")).on_hover_text(t("board.export.hint")).clicked() {
+                soundboard::export_async(self.sh.clone());
+            }
+            if ui.button(t("board.import")).clicked() {
+                soundboard::import_async(self.sh.clone());
+            }
+        });
+        ui.add_space(10.0);
     }
 
     pub fn new(sh: Arc<Shared>, tx: Sender<Cmd>, saved: Saved, background: bool) -> Self {
@@ -487,6 +824,16 @@ impl App {
             sound_keys: Vec::new(),
             last_board_ver: 0,
             menu_fonts: false,
+            board_search: String::new(),
+            board_group: String::new(),
+            edit_sound: None,
+            tts_text: String::new(),
+            tts_voices: Arc::new(parking_lot::Mutex::new(None)),
+            tts_loading: false,
+            voice_keys: Vec::new(),
+            voice_hk_applied: false,
+            voice_hk_failed: 0,
+            api_copied: None,
             sh,
             tx,
             devices,
@@ -555,6 +902,15 @@ impl App {
             auto_profile: self.auto_profile,
             app_rules: self.sh.app_rules.lock().clone(),
             no_update_check: self.no_update_check,
+            pc_audio: self.sh.pc_on.load(Relaxed),
+            pc_level: load_f(&self.sh.pc_level),
+            pc_no_duck: !self.sh.pc_duck.load(Relaxed),
+            auto_buf: self.sh.auto_buf.load(Relaxed),
+            welcomed: self.sh.welcomed.load(Relaxed),
+            voice_hotkeys: self.sh.voice_hotkeys.load(Relaxed),
+            api_on: self.sh.api_on.load(Relaxed),
+            tts_voice: self.sh.tts_voice.lock().clone(),
+            tts_rate: self.sh.tts_rate.load(Relaxed),
             lang: if Lang::from_code(&self.lang_pref).is_some() { self.lang_pref.clone() } else { String::new() },
             profiles: self.sh.profiles.read().clone(),
             note: String::new(),
@@ -566,6 +922,17 @@ impl App {
             || cur.hotkey != s.hotkey
             || cur.no_beep != s.no_beep
             || cur.lang != s.lang
+            || cur.pc_audio != s.pc_audio
+            || cur.pc_level != s.pc_level
+            || cur.pc_no_duck != s.pc_no_duck
+            || cur.auto_buf != s.auto_buf
+            || cur.welcomed != s.welcomed
+            || cur.voice_hotkeys != s.voice_hotkeys
+            || cur.api_on != s.api_on
+            || cur.tts_voice != s.tts_voice
+            || cur.tts_rate != s.tts_rate
+            || cur.auto_profile != s.auto_profile
+            || cur.no_update_check != s.no_update_check
             || cur.profiles != s.profiles;
         if dirty && (force || self.last_save.elapsed() > Duration::from_secs(1)) {
             settings::save(&cur);
@@ -581,11 +948,18 @@ impl App {
         if let Some((ver, url)) = upd.filter(|_| !self.update_dismissed) {
             ui.horizontal(|ui| {
                 ui.label(RichText::new(tf("upd.available", &[&ver])).color(SIG));
+                let busy = self.sh.upd_busy.load(Relaxed);
+                if ui.add_enabled(!busy, egui::Button::new(t("upd.install"))).on_hover_text(t("upd.install.hint")).clicked() {
+                    crate::update::install_async(self.sh.clone(), ver.clone());
+                }
+                if busy {
+                    ui.label(RichText::new(t("upd.installing")).small().color(SIG));
+                }
                 if ui.button(t("upd.get")).clicked() {
-                    {
-                        use std::os::windows::process::CommandExt;
-                        let _ = std::process::Command::new("cmd").args(["/c", "start", "", &url]).creation_flags(0x0800_0000).spawn();
-                    }
+                    open_url(&url);
+                }
+                if let Some(e) = self.sh.upd_msg.lock().clone() {
+                    ui.colored_label(WARN, e);
                 }
                 if ui.small_button("×").clicked() {
                     self.update_dismissed = true;
@@ -1040,6 +1414,43 @@ impl App {
         });
         ui.label(RichText::new(t("app.hint")).small().color(MUTE));
 
+        // ---- đổi giọng bằng phím, tự chỉnh bộ đệm, API điều khiển ----
+        ui.add_space(14.0);
+        ui.separator();
+        ui.add_space(6.0);
+        let mut vhk = self.sh.voice_hotkeys.load(Relaxed);
+        if ui.checkbox(&mut vhk, t("set.voicekeys")).on_hover_text(t("set.voicekeys.hint")).changed() {
+            self.sh.voice_hotkeys.store(vhk, Relaxed);
+            self.persist(true);
+        }
+        if vhk && self.voice_hk_failed > 0 {
+            ui.colored_label(WARN, tf("set.voicekeys.fail", &[&self.voice_hk_failed.to_string()]));
+        }
+        let mut api = self.sh.api_on.load(Relaxed);
+        if ui.checkbox(&mut api, t("api.toggle")).on_hover_text(t("api.hint")).changed() {
+            self.sh.api_on.store(api, Relaxed);
+            self.persist(true);
+        }
+        if api {
+            let port = self.sh.api_port.load(Relaxed);
+            if port == 0 {
+                ui.label(RichText::new(t("api.starting")).small().color(MUTE));
+            } else {
+                let base = format!("http://127.0.0.1:{port}/api/");
+                let tok = self.sh.token.read().clone();
+                ui.label(RichText::new(tf("api.where", &[&base])).small().color(MUTE));
+                ui.label(RichText::new(t("api.cmds")).small().color(MUTE));
+                if ui.button(t("api.copy")).clicked() {
+                    ui.ctx().copy_text(format!("{base}status?k={tok}"));
+                    self.api_copied = Some(Instant::now());
+                }
+                if self.api_copied.is_some_and(|at| at.elapsed() < Duration::from_secs(3)) {
+                    ui.label(RichText::new(t("api.copied")).small().color(SIG));
+                }
+                ui.label(RichText::new(t("api.warn")).small().color(MUTE));
+            }
+        }
+
         // ---- kiểm tra bản mới ----
         ui.add_space(14.0);
         ui.separator();
@@ -1233,6 +1644,8 @@ impl App {
                 Tab::Board => centered(ui, 860.0, |ui| self.board_panel(ui)),
                 Tab::Sound => {
                     self.room_card(ui);
+                    self.pc_card(ui);
+                    self.test_card(ui);
                     let wide = ui.available_width() > 940.0;
                     let p = &mut self.p;
                     let sh = &self.sh;
@@ -1241,13 +1654,13 @@ impl App {
                         ui.columns(3, |c| {
                             section_noise(&mut c[0], p, sh, connected);
                             section_eq(&mut c[1], p);
-                            section_volume(&mut c[2], p);
+                            section_volume(&mut c[2], p, sh);
                             section_fx(&mut c[2], p);
                         });
                     } else {
                         section_noise(ui, p, sh, connected);
                         section_eq(ui, p);
-                        section_volume(ui, p);
+                        section_volume(ui, p, sh);
                         section_fx(ui, p);
                     }
                 }
@@ -1333,54 +1746,16 @@ fn section_eq(ui: &mut Ui, p: &mut Params) {
     ctl(ui, &t("ctl.mud"), &t("ctl.mud.hint"), &mut p.mud, -12.0..=12.0, " dB");
     ctl(ui, &t("ctl.pres"), &t("ctl.pres.hint"), &mut p.pres, -12.0..=12.0, " dB");
     ctl(ui, &t("ctl.air"), &t("ctl.air.hint"), &mut p.air, -12.0..=12.0, " dB");
+    ctl(ui, &t("ctl.deess"), &t("ctl.deess.hint"), &mut p.deess, 0.0..=100.0, "%");
+    switch_row(ui, &t("ctl.plosive"), &t("ctl.plosive.hint"), &mut p.plosive);
 }
-
-/// Giọng đổi sẵn: ghép từ các hiệu ứng có sẵn (đổi tông, vang, robot).
-struct Voice {
-    key: &'static str,
-    pitch: f32,
-    reverb: f32,
-    robot: bool,
-    echo: f32,
-    chorus: f32,
-    dist: f32,
-    band: u8,
-}
-const fn voice(key: &'static str, pitch: f32, reverb: f32, robot: bool, echo: f32, chorus: f32, dist: f32, band: u8) -> Voice {
-    Voice { key, pitch, reverb, robot, echo, chorus, dist, band }
-}
-const VOICES: [Voice; 10] = [
-    voice("fx.none", 0.0, 0.0, false, 0.0, 0.0, 0.0, 0),
-    voice("fx.deep", -5.0, 0.0, false, 0.0, 0.0, 0.0, 0),
-    voice("fx.small", 7.0, 0.0, false, 0.0, 0.0, 0.0, 0),
-    voice("fx.robot", 0.0, 0.0, true, 0.0, 0.0, 0.0, 0),
-    voice("fx.ghost", -2.0, 65.0, false, 35.0, 0.0, 0.0, 0),
-    voice("fx.alien", 4.0, 20.0, true, 0.0, 40.0, 0.0, 0),
-    voice("fx.monster", -9.0, 25.0, false, 0.0, 0.0, 35.0, 0),
-    voice("fx.cave", 0.0, 85.0, false, 45.0, 0.0, 0.0, 0),
-    voice("fx.radio", 0.0, 0.0, false, 0.0, 0.0, 15.0, 1),
-    voice("fx.megaphone", 0.0, 0.0, false, 0.0, 0.0, 40.0, 2),
-];
 
 fn section_fx(ui: &mut Ui, p: &mut Params) {
     heading(ui, &t("sec.fx"), &t("sec.fx.lead"));
     ui.horizontal_wrapped(|ui| {
-        for v in VOICES.iter() {
-            let on = p.fx_pitch == v.pitch
-                && p.fx_reverb == v.reverb
-                && p.fx_robot == v.robot
-                && p.fx_echo == v.echo
-                && p.fx_chorus == v.chorus
-                && p.fx_dist == v.dist
-                && p.fx_band == v.band;
-            if ui.selectable_label(on, t(v.key)).clicked() {
-                p.fx_pitch = v.pitch;
-                p.fx_reverb = v.reverb;
-                p.fx_robot = v.robot;
-                p.fx_echo = v.echo;
-                p.fx_chorus = v.chorus;
-                p.fx_dist = v.dist;
-                p.fx_band = v.band;
+        for (i, v) in settings::VOICES.iter().enumerate() {
+            if ui.selectable_label(v.is_on(p), t(v.key)).clicked() {
+                *p = settings::apply_voice(p, i);
             }
         }
     });
@@ -1405,12 +1780,20 @@ fn section_fx(ui: &mut Ui, p: &mut Params) {
     switch_row(ui, &t("ctl.robot"), "", &mut p.fx_robot);
 }
 
-fn section_volume(ui: &mut Ui, p: &mut Params) {
+fn section_volume(ui: &mut Ui, p: &mut Params, sh: &Shared) {
     heading(ui, &t("sec.vol"), &t("sec.vol.lead"));
     switch_row(ui, &t("ctl.agc"), &t("ctl.agc.hint"), &mut p.agc);
     ctl(ui, &t("ctl.comp"), &t("ctl.comp.hint"), &mut p.comp, 0.0..=100.0, "%");
     ctl(ui, &t("ctl.gain"), "", &mut p.gain, -12.0..=24.0, " dB");
-    ctl(ui, &t("ctl.buf"), &t("ctl.buf.hint"), &mut p.buf_ms, 30.0..=300.0, " ms");
+    let auto = sh.auto_buf.load(Relaxed);
+    ui.add_enabled_ui(!auto, |ui| {
+        ctl(ui, &t("ctl.buf"), &t("ctl.buf.hint"), &mut p.buf_ms, 30.0..=300.0, " ms");
+    });
+    let mut a = auto;
+    switch_row(ui, &t("ctl.autobuf"), &t("ctl.autobuf.hint"), &mut a);
+    if a != auto {
+        sh.auto_buf.store(a, Relaxed);
+    }
 }
 
 /// Một thanh chỉnh: nhãn + giá trị ở trên, thanh trượt rộng hết cột, gợi ý nhỏ ở dưới.
@@ -1689,7 +2072,8 @@ impl eframe::App for App {
             let active = self.sh.connected.load(Relaxed)
                 || self.m.d_in > -80.0
                 || self.m.d_out > -80.0
-                || self.sh.cal_state.load(Relaxed) != 0;
+                || self.sh.cal_state.load(Relaxed) != 0
+                || self.sh.test_state.load(Relaxed) != 0;
             // Rảnh thì vẽ thưa (1 lần/giây): mọi thay đổi quan trọng đã có luồng khác đánh thức (Shared::wake_ui)
             let ms = match (active, focused) {
                 (true, true) => 33,
@@ -1717,12 +2101,20 @@ impl eframe::App for App {
             self.last_board_ver = bv;
             self.sync_sound_hotkeys();
         }
+        let want_vhk = self.sh.voice_hotkeys.load(Relaxed);
+        if want_vhk != self.voice_hk_applied {
+            self.voice_hk_applied = want_vhk;
+            self.sync_voice_hotkeys();
+        }
         egui::TopBottomPanel::top("tabs")
             .frame(egui::Frame::default().fill(PANEL).inner_margin(egui::Margin::symmetric(18, 10)))
             .show(ctx, |ui| self.tab_bar(ui));
         egui::CentralPanel::default()
             .frame(egui::Frame::default().fill(BG).inner_margin(22.0))
             .show(ctx, |ui| self.main_panel(ui, dt));
+        if !self.sh.welcomed.load(Relaxed) {
+            self.wizard(ctx);
+        }
 
         // thay đổi từ app PC: đẩy sang bộ xử lý và điện thoại
         if *self.sh.params.read() != self.p {

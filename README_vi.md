@@ -40,6 +40,14 @@
 - **Cấu hình theo ứng dụng:** tự đổi sang một cấu hình nhanh hoặc hồ sơ khi chương trình như Discord hay game đang chạy, và quay lại khi nó đóng.
 - **Tab** (Kết nối, Âm thanh, Soundboard, Cài đặt) giúp app trên PC gọn gàng hơn.
 - **Báo bản mới:** app có thể báo khi GitHub có bản phát hành mới (một yêu cầu nhỏ lúc khởi động và mỗi sáu giờ, không gửi dữ liệu cá nhân; tắt được trong Cài đặt). App không tự cài gì cả.
+- **Tiếng PC vào mic:** trộn nhạc hoặc video đang phát trên PC vào giọng bạn, tự hạ nhỏ khi bạn nói, để chia sẻ bài hát hay đoạn clip cho bạn bè nghe.
+- **Gõ chữ để nói:** gõ một câu, giọng đọc của Windows nói thẳng vào mic (chọn được giọng và tốc độ).
+- **Thử mic của tôi:** thu 5 giây rồi nghe lại qua loa, đúng như người khác sẽ nghe bạn.
+- **Phím đổi giọng và menu khay:** `Ctrl+Alt+F1…F10` hoặc icon khay để đổi giữa mười giọng khi đang chơi.
+- **Giảm âm "s" chói và lọc tiếng "bụp" (p, b)**; **bộ đệm tự động** tăng bộ đệm khi bị giật và hạ lại khi đường truyền ổn định.
+- **Soundboard nâng cao:** tìm kiếm, chia nhóm, âm lượng riêng từng âm, lặp, cắt đầu/đuôi, sao lưu và khôi phục cả bảng âm thanh.
+- **API điều khiển cục bộ** (mặc định tắt): `http://127.0.0.1:CỔNG/api/mute?on=1&k=MÃ`, `voice?n=3`, `play?name=Airhorn`, `say?text=Xin chào`… cho Stream Deck, OBS hay AutoHotkey. Chỉ nghe trên chính PC này và cần mã ghép nối.
+- **Hướng dẫn lần đầu** kiểm tra mic ảo (VB-Cable hoặc Steam) và chỉ ba bước; nút **Cài ngay** ở thanh báo bản mới tải bản phát hành, kiểm tra SHA-256 theo `SHA256.txt` đã công bố rồi khởi động lại.
 - Ba cách kết nối: **Wi-Fi**, **cáp USB** (chia sẻ mạng USB) và **Bluetooth** (chia sẻ mạng Bluetooth). Mã QR chứa mọi địa chỉ của PC, điện thoại tự thử lần lượt.
 - Chỉ một file `larma-mic.exe` chạy ngay (khoảng 9 MB, không trình cài, không cần runtime). Khi thu vào khay hệ thống, app dùng ≈ 0% CPU và khoảng 4 MB RAM.
 - Xử lý giọng ở 48 kHz: khử ồn AI ([RNNoise](https://jmvalin.ca/demo/rnnoise/)), cắt tiếng ù, cổng ồn nhìn trước 5 ms, EQ 4 dải, tự cân âm lượng (AGC), nén giọng, âm lượng và bộ chống vỡ tiếng −3 dB.

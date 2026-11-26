@@ -60,6 +60,14 @@ impl Biquad {
         self.set((1.0 - cw) / 2.0, 1.0 - cw, (1.0 - cw) / 2.0, 1.0 + al, -2.0 * cw, 1.0 - al);
     }
 
+    /// Dải thông (đỉnh 0 dB tại `f`, không lệch pha ở giữa dải): dùng cho bộ khử "s" và lọc tiếng "bụp".
+    pub fn bandpass(&mut self, f: f32, q: f32) {
+        let w = 2.0 * PI * f / SR;
+        let (cw, sw) = (w.cos(), w.sin());
+        let al = sw / (2.0 * q);
+        self.set(al, 0.0, -al, 1.0 + al, -2.0 * cw, 1.0 - al);
+    }
+
     pub fn highpass(&mut self, f: f32, q: f32) {
         let w = 2.0 * PI * f / SR;
         let (cw, sw) = (w.cos(), w.sin());
@@ -414,6 +422,13 @@ pub struct Chain {
     band_hp: [Biquad; 2],
     band_lp: [Biquad; 2],
     band_set: u8,
+    // khử âm "s" và lọc tiếng "bụp"
+    ess_bp: Biquad,
+    ess_env: f32,
+    ess_g: f32,
+    plo_bp: Biquad,
+    plo_env: f32,
+    plo_g: f32,
     // hằng số thời gian
     env_decay: f32,
     a_up: f32,
@@ -458,6 +473,20 @@ impl Chain {
             band_hp: [Biquad::new(), Biquad::new()],
             band_lp: [Biquad::new(), Biquad::new()],
             band_set: 0,
+            ess_bp: {
+                let mut b = Biquad::new();
+                b.bandpass(7000.0, 1.2);
+                b
+            },
+            ess_env: 0.0,
+            ess_g: 1.0,
+            plo_bp: {
+                let mut b = Biquad::new();
+                b.bandpass(90.0, 0.7);
+                b
+            },
+            plo_env: 0.0,
+            plo_g: 1.0,
             env_decay: k(0.02),
             a_up: k(0.0015), // mở rất nhanh: nhờ nhìn trước 5 ms nên đầu chữ vẫn nguyên vẹn
             a_down: k(0.18),
@@ -548,6 +577,9 @@ impl Chain {
         let chorus_mix = p.fx_chorus / 100.0;
         let drive = 1.0 + (p.fx_dist / 100.0) * 18.0;
         let dist_norm = 1.0 / (drive * 0.5).tanh().max(0.2);
+        // khử "s": ngưỡng thấp dần khi tăng mức (100 % = -40 dB trên dải 5,5 kHz trở lên), giảm tối đa 12 dB
+        let ess_on = p.deess > 0.5;
+        let ess_thr = db2lin(-12.0 - p.deess * 0.28);
         let mut out_peak = 0f32;
         let mut gate_peak = 0f32;
 
@@ -585,6 +617,34 @@ impl Chain {
             s = self.mud.run(s);
             s = self.pres.run(s);
             s = self.air.run(s);
+
+            // bỏ tiếng "bụp" của chữ p, b: khi dải quanh 90 Hz vọt lên thì hạ riêng dải đó (như EQ động)
+            if p.plosive {
+                let lf = self.plo_bp.run(s);
+                let a = lf.abs();
+                self.plo_env = if a > self.plo_env { a } else { self.plo_env * 0.9999 };
+                let want = if self.plo_env > 0.2 { (0.2 / self.plo_env).powi(2).max(0.05) } else { 1.0 };
+                self.plo_g += (want - self.plo_g) * if want < self.plo_g { 0.2 } else { 0.002 };
+                s -= lf * (1.0 - self.plo_g);
+            } else {
+                self.plo_bp.run(s);
+                self.plo_g = 1.0;
+                self.plo_env = 0.0;
+            }
+
+            // giảm tiếng "s" chói: dải quanh 7 kHz bị hạ riêng khi vượt ngưỡng (EQ động)
+            if ess_on {
+                let hf = self.ess_bp.run(s);
+                let a = hf.abs();
+                self.ess_env = if a > self.ess_env { a + (self.ess_env - a) * 0.5 } else { self.ess_env * 0.998 };
+                let want = if self.ess_env > ess_thr { (ess_thr / self.ess_env).max(0.25) } else { 1.0 };
+                self.ess_g += (want - self.ess_g) * if want < self.ess_g { 0.1 } else { 0.004 };
+                s -= hf * (1.0 - self.ess_g);
+            } else {
+                self.ess_bp.run(s);
+                self.ess_g = 1.0;
+                self.ess_env = 0.0;
+            }
 
             // tự cân âm lượng: đo mức RMS chậm, chỉ chỉnh khi có tiếng nói (trên -50 dB)
             if p.agc {
@@ -877,5 +937,38 @@ mod tests {
         assert!(at(30.0) < -10.0, "cắt ù tại 30 Hz: {}", at(30.0));
         assert!((at(3200.0) - (-4.0)).abs() < 1.5, "rõ giọng tại 3,2 kHz: {}", at(3200.0));
         assert!(at(8000.0).abs() < 2.0, "băng cao tại 8 kHz: {}", at(8000.0));
+    }
+
+    #[test]
+    fn deesser_tames_sibilance_but_leaves_the_voice_alone() {
+        use std::f32::consts::PI;
+        let tone = |hz: f32, amp: f32| move |i: usize| (i as f32 * 2.0 * PI * hz / SR).sin() * amp;
+        let off = clean();
+        let on = Params { deess: 80.0, ..clean() };
+        // "s" at 7 kHz
+        let a = rms(&run(&off, 1.0, tone(7000.0, 0.3))[24_000..]);
+        let b = rms(&run(&on, 1.0, tone(7000.0, 0.3))[24_000..]);
+        assert!(b < a * 0.6, "sibilance only {:.2} -> {:.2}", a, b);
+        // a 500 Hz voice is not touched
+        let a = rms(&run(&off, 1.0, tone(500.0, 0.3))[24_000..]);
+        let b = rms(&run(&on, 1.0, tone(500.0, 0.3))[24_000..]);
+        assert!((a - b).abs() < a * 0.05, "voice {:.3} -> {:.3}", a, b);
+    }
+
+    #[test]
+    fn plosive_filter_cuts_a_low_thump_only() {
+        use std::f32::consts::PI;
+        let off = clean();
+        let on = Params { plosive: true, ..clean() };
+        // a loud 90 Hz thump
+        let thump = |i: usize| (i as f32 * 2.0 * PI * 90.0 / SR).sin() * 0.6;
+        let a = rms(&run(&off, 1.0, thump)[24_000..]);
+        let b = rms(&run(&on, 1.0, thump)[24_000..]);
+        assert!(b < a * 0.5, "thump {:.3} -> {:.3}", a, b);
+        // normal speech level at 200 Hz stays
+        let voice = |i: usize| (i as f32 * 2.0 * PI * 200.0 / SR).sin() * 0.1;
+        let a = rms(&run(&off, 1.0, voice)[24_000..]);
+        let b = rms(&run(&on, 1.0, voice)[24_000..]);
+        assert!((a - b).abs() < a * 0.05, "voice {:.3} -> {:.3}", a, b);
     }
 }
