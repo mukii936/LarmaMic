@@ -35,7 +35,7 @@
 - **Bluetooth uses compression** (IMA ADPCM, 4:1) so it sounds better than plain 24 kHz audio on a slow link.
 - **Echo cancellation:** removes what the PC plays (the other side of a call) from the microphone so they do not hear themselves. It listens to the PC's output (WASAPI loopback), finds the echo delay by itself and subtracts it with an adaptive filter. Tested with simulated echo paths, not yet with a variety of real rooms: use headphones or turn it off if it sounds odd.
 - **Soundboard:** play sound effects through your microphone. Add mp3/wav/ogg/flac files (button or drag and drop) or paste a direct link to an audio file; each sound is a button, the first nine also get `Ctrl+Alt+1…9`. Optionally lowers your voice while a sound plays, and the phone (web page or Android app) shows the same buttons. Sounds are your own files or links you choose; make sure you may use them.
-- **Voice changer presets:** Deep, Small, Robot and Ghost voices in one click (built from the pitch, reverb and robot effects).
+- **Voice effects:** pitch, reverb, robot, **echo**, **chorus** (doubling), **distortion** and a telephone/megaphone band filter, with one-click presets: Deep, Small, Robot, Ghost, Alien, Monster, Cave, Radio and Megaphone. Echo, chorus and distortion sliders are also on the phone page and the Android app.
 - **Measure my room:** talk for 10 seconds and the app suggests a noise gate threshold and EQ corrections; you decide whether to apply them.
 - **Per-app profiles:** switch to a preset or saved profile while a program such as Discord or a game is running, and go back when it closes.
 - **Tabs** (Connect, Sound, Soundboard, Settings) keep the desktop app tidy.

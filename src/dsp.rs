@@ -53,6 +53,13 @@ impl Biquad {
         self.c = Coef { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0 };
     }
 
+    pub fn lowpass(&mut self, f: f32, q: f32) {
+        let w = 2.0 * PI * f / SR;
+        let (cw, sw) = (w.cos(), w.sin());
+        let al = sw / (2.0 * q);
+        self.set((1.0 - cw) / 2.0, 1.0 - cw, (1.0 - cw) / 2.0, 1.0 + al, -2.0 * cw, 1.0 - al);
+    }
+
     pub fn highpass(&mut self, f: f32, q: f32) {
         let w = 2.0 * PI * f / SR;
         let (cw, sw) = (w.cos(), w.sin());
@@ -186,6 +193,51 @@ impl Robot {
         self.comb[self.i] = c;
         self.i = (self.i + 1) % self.comb.len();
         0.3 * x + 0.7 * c
+    }
+}
+
+/// Vọng lặp: một đường trễ 300 ms có hồi tiếp.
+struct Echo {
+    buf: Vec<f32>,
+    i: usize,
+}
+impl Echo {
+    fn new() -> Self {
+        Self { buf: vec![0.0; (SR * 0.3) as usize], i: 0 }
+    }
+    fn process(&mut self, x: f32, mix: f32) -> f32 {
+        let y = self.buf[self.i];
+        self.buf[self.i] = x + y * 0.42;
+        self.i = (self.i + 1) % self.buf.len();
+        x + y * mix
+    }
+}
+
+/// Nhân đôi giọng: bản sao trễ ~18 ms được đung đưa chậm bằng LFO 0,9 Hz.
+struct Chorus {
+    buf: Vec<f32>,
+    w: usize,
+    phase: f32,
+}
+impl Chorus {
+    fn new() -> Self {
+        Self { buf: vec![0.0; 4096], w: 0, phase: 0.0 }
+    }
+    fn process(&mut self, x: f32, mix: f32) -> f32 {
+        self.buf[self.w] = x;
+        self.phase += 2.0 * PI * 0.9 / SR;
+        if self.phase > 2.0 * PI {
+            self.phase -= 2.0 * PI;
+        }
+        let delay = SR * (0.018 + 0.006 * self.phase.sin());
+        let pos = self.w as f32 - delay;
+        let pos = if pos < 0.0 { pos + self.buf.len() as f32 } else { pos };
+        let i0 = pos.floor() as usize % self.buf.len();
+        let i1 = (i0 + 1) % self.buf.len();
+        let fr = pos - pos.floor();
+        let d = self.buf[i0] * (1.0 - fr) + self.buf[i1] * fr;
+        self.w = (self.w + 1) % self.buf.len();
+        x * (1.0 - 0.35 * mix) + d * mix * 0.9
     }
 }
 
@@ -357,6 +409,11 @@ pub struct Chain {
     pitch: Pitch,
     robot: Robot,
     reverb: Reverb,
+    echo: Echo,
+    chorus: Chorus,
+    band_hp: [Biquad; 2],
+    band_lp: [Biquad; 2],
+    band_set: u8,
     // hằng số thời gian
     env_decay: f32,
     a_up: f32,
@@ -396,6 +453,11 @@ impl Chain {
             pitch: Pitch::new(),
             robot: Robot::new(),
             reverb: Reverb::new(),
+            echo: Echo::new(),
+            chorus: Chorus::new(),
+            band_hp: [Biquad::new(), Biquad::new()],
+            band_lp: [Biquad::new(), Biquad::new()],
+            band_set: 0,
             env_decay: k(0.02),
             a_up: k(0.0015), // mở rất nhanh: nhờ nhìn trước 5 ms nên đầu chữ vẫn nguyên vẹn
             a_down: k(0.18),
@@ -423,6 +485,17 @@ impl Chain {
         }
         if changed(|p| p.air) {
             self.air.highshelf(9000.0, p.air);
+        }
+        // bộ lọc dải cho giọng "điện thoại" / "loa phóng thanh"
+        if self.band_set != p.fx_band {
+            self.band_set = p.fx_band;
+            let (hp, lp) = if p.fx_band == 1 { (300.0, 3400.0) } else { (550.0, 4200.0) };
+            for b in self.band_hp.iter_mut() {
+                b.highpass(hp, 0.707);
+            }
+            for b in self.band_lp.iter_mut() {
+                b.lowpass(lp, 0.707);
+            }
         }
         self.prev = Some(*p);
     }
@@ -471,6 +544,10 @@ impl Chain {
         let use_pitch = p.fx_pitch.abs() > 0.4;
         let pitch_ratio = 2f32.powf(p.fx_pitch / 12.0);
         let wet = (p.fx_reverb / 100.0) * 1.6;
+        let echo_mix = (p.fx_echo / 100.0) * 0.85;
+        let chorus_mix = p.fx_chorus / 100.0;
+        let drive = 1.0 + (p.fx_dist / 100.0) * 18.0;
+        let dist_norm = 1.0 / (drive * 0.5).tanh().max(0.2);
         let mut out_peak = 0f32;
         let mut gate_peak = 0f32;
 
@@ -554,6 +631,24 @@ impl Chain {
             }
             if wet > 0.01 {
                 s += self.reverb.process(s) * wet;
+            }
+            if p.fx_dist > 0.5 {
+                s = (s * drive).tanh() * dist_norm * 0.5;
+            }
+            if p.fx_band > 0 {
+                for b in self.band_hp.iter_mut() {
+                    s = b.run(s);
+                }
+                for b in self.band_lp.iter_mut() {
+                    s = b.run(s);
+                }
+                s *= 1.4; // la bandpass cắt bớt năng lượng: bù lại một chút
+            }
+            if chorus_mix > 0.01 {
+                s = self.chorus.process(s, chorus_mix);
+            }
+            if echo_mix > 0.01 {
+                s = self.echo.process(s, echo_mix);
             }
 
             // chống vỡ tiếng
@@ -706,6 +801,50 @@ mod tests {
         let late = rms(&out[80_000..96_000]);
         assert!(early > 1e-4, "vang không có đuôi: {early}");
         assert!(late < early, "đuôi vang không tắt dần: {early} -> {late}");
+    }
+
+    #[test]
+    fn echo_repeats_the_voice_300_ms_later() {
+        let p = Params { fx_echo: 100.0, ..clean() };
+        // a 50 ms tone burst, then silence
+        let burst = (SR * 0.05) as usize;
+        let mut tone = sine(440.0, 0.4);
+        let out = run(&p, 1.0, move |n| if n < burst { tone(n) } else { 0.0 });
+        let lag = (SR * 0.3) as usize;
+        let at_echo = rms(&out[lag + 200..lag + burst - 200]);
+        let between = rms(&out[burst + 1500..lag - 500]);
+        assert!(at_echo > 0.05, "echo level {at_echo}");
+        assert!(between < at_echo / 5.0, "silence between voice and echo: {between} vs {at_echo}");
+    }
+
+    #[test]
+    fn telephone_filter_cuts_lows_and_highs_but_keeps_the_middle() {
+        let p = Params { fx_band: 1, ..clean() };
+        let low = rms(&run(&p, 1.0, sine(100.0, 0.3))[SR as usize / 2..]);
+        let mid = rms(&run(&p, 1.0, sine(1000.0, 0.3))[SR as usize / 2..]);
+        let high = rms(&run(&p, 1.0, sine(10_000.0, 0.3))[SR as usize / 2..]);
+        assert!(mid > 0.1, "mid {mid}");
+        assert!(low < mid * 0.15, "low {low} mid {mid}");
+        assert!(high < mid * 0.15, "high {high} mid {mid}");
+    }
+
+    #[test]
+    fn distortion_adds_harmonics_and_stays_bounded() {
+        let p = Params { fx_dist: 100.0, ..clean() };
+        let out = run(&p, 0.5, sine(300.0, 0.4));
+        assert!(out.iter().all(|x| x.abs() <= 1.0));
+        // a clipped sine has many more zero crossings of its derivative than a pure one: check it is clearly squarer
+        let peak = out.iter().fold(0f32, |m, x| m.max(x.abs()));
+        let r = rms(&out[out.len() / 2..]);
+        assert!(r / peak > 0.8, "crest factor says it is not clipped: rms {r} peak {peak}");
+    }
+
+    #[test]
+    fn chorus_keeps_the_level_close() {
+        let dry = rms(&run(&clean(), 1.0, sine(500.0, 0.3))[SR as usize / 2..]);
+        let p = Params { fx_chorus: 100.0, ..clean() };
+        let wet = rms(&run(&p, 1.0, sine(500.0, 0.3))[SR as usize / 2..]);
+        assert!(wet > dry * 0.5 && wet < dry * 1.6, "dry {dry} wet {wet}");
     }
 
     #[test]

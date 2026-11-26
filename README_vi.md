@@ -35,7 +35,7 @@
 - **Bluetooth có nén âm thanh** (IMA ADPCM, 4:1) nên nghe tốt hơn âm thanh 24 kHz thường trên đường truyền chậm.
 - **Khử vọng (echo):** loại âm thanh PC đang phát (tiếng người bên kia cuộc gọi) khỏi mic để họ không nghe lại chính mình. App nghe âm thanh đầu ra của PC (WASAPI loopback), tự tìm độ trễ của tiếng vọng rồi trừ đi bằng bộ lọc thích nghi. Đã thử với đường vọng mô phỏng, chưa thử nhiều phòng thật: nếu nghe lạ thì dùng tai nghe hoặc tắt đi.
 - **Soundboard:** phát hiệu ứng âm thanh qua mic. Thêm file mp3/wav/ogg/flac (nút hoặc kéo thả) hoặc dán link trực tiếp tới file âm thanh; mỗi âm là một nút, chín âm đầu còn có phím `Ctrl+Alt+1…9`. Có thể hạ giọng bạn xuống khi đang phát, và điện thoại (trang web hoặc app Android) cũng có các nút này. Âm thanh là file hoặc link do bạn chọn, hãy chắc rằng bạn được phép dùng chúng.
-- **Đổi giọng sẵn:** giọng trầm, giọng nhỏ, robot, giọng ma chỉ một cú bấm (ghép từ các hiệu ứng đổi tông, vang và robot).
+- **Hiệu ứng giọng:** đổi tông, vang, robot, **vọng lặp (echo)**, **nhân đôi giọng (chorus)**, **méo tiếng** và bộ lọc điện thoại/loa phóng thanh, kèm các giọng đổi sẵn chỉ một cú bấm: trầm, nhỏ, robot, ma, người ngoài hành tinh, quái vật, hang động, radio, loa phóng thanh. Thanh echo, chorus và méo tiếng cũng có trên trang điện thoại và app Android.
 - **Tự đo phòng:** nói 10 giây, app gợi ý ngưỡng cổng ồn và cách chỉnh EQ; bạn quyết định có áp dụng hay không.
 - **Cấu hình theo ứng dụng:** tự đổi sang một cấu hình nhanh hoặc hồ sơ khi chương trình như Discord hay game đang chạy, và quay lại khi nó đóng.
 - **Tab** (Kết nối, Âm thanh, Soundboard, Cài đặt) giúp app trên PC gọn gàng hơn.

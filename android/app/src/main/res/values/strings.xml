@@ -91,6 +91,9 @@
     <string name="ctl_robot">Robot voice</string>
     <string name="lang_title">Language</string>
     <string name="lang_auto">Auto</string>
+    <string name="ctl_echo">Echo</string>
+    <string name="ctl_chorus">Chorus (doubling)</string>
+    <string name="ctl_dist">Distortion</string>
     <string name="sounds_title">Soundboard</string>
     <string name="sounds_stop">Stop all</string>
     <string name="notif_title">LarmaMic is streaming</string>

@@ -90,6 +90,9 @@ export const fr: Dict = {
   'ctl.robot': 'Voix de robot',
   'lang.title': 'Langue',
   'lang.auto': 'Auto',
+  'ctl.echo': 'Écho',
+  'ctl.chorus': 'Chœur (doublage)',
+  'ctl.dist': 'Distorsion',
   'sounds.title': 'Soundboard',
   'sounds.stop': 'Tout arrêter',
 };

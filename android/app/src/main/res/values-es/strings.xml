@@ -90,6 +90,9 @@
     <string name="ctl_robot">Voz de robot</string>
     <string name="lang_title">Idioma</string>
     <string name="lang_auto">Auto</string>
+    <string name="ctl_echo">Eco</string>
+    <string name="ctl_chorus">Coro (doblado)</string>
+    <string name="ctl_dist">Distorsión</string>
     <string name="sounds_title">Tablero de sonidos</string>
     <string name="sounds_stop">Detener todo</string>
     <string name="notif_title">LarmaMic está transmitiendo</string>

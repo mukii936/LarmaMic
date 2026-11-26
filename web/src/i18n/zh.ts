@@ -90,6 +90,9 @@ export const zh: Dict = {
   'ctl.robot': '机器人声',
   'lang.title': '语言',
   'lang.auto': '自动',
+  'ctl.echo': '回声',
+  'ctl.chorus': '合唱（加倍）',
+  'ctl.dist': '失真',
   'sounds.title': '音效板',
   'sounds.stop': '全部停止',
 };

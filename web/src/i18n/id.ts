@@ -90,6 +90,9 @@ export const id: Dict = {
   'ctl.robot': 'Suara robot',
   'lang.title': 'Bahasa',
   'lang.auto': 'Otomatis',
+  'ctl.echo': 'Gema (echo)',
+  'ctl.chorus': 'Chorus (penggandaan)',
+  'ctl.dist': 'Distorsi',
   'sounds.title': 'Soundboard',
   'sounds.stop': 'Hentikan semua',
 };

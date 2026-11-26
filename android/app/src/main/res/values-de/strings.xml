@@ -90,6 +90,9 @@
     <string name="ctl_robot">Roboterstimme</string>
     <string name="lang_title">Sprache</string>
     <string name="lang_auto">Auto</string>
+    <string name="ctl_echo">Echo</string>
+    <string name="ctl_chorus">Chorus (Verdopplung)</string>
+    <string name="ctl_dist">Verzerrung</string>
     <string name="sounds_title">Soundboard</string>
     <string name="sounds_stop">Alle stoppen</string>
     <string name="notif_title">LarmaMic überträgt</string>

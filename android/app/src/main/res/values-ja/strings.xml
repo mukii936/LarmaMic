@@ -90,6 +90,9 @@
     <string name="ctl_robot">ロボットボイス</string>
     <string name="lang_title">言語</string>
     <string name="lang_auto">自動</string>
+    <string name="ctl_echo">エコー</string>
+    <string name="ctl_chorus">コーラス（ダブリング）</string>
+    <string name="ctl_dist">ディストーション</string>
     <string name="sounds_title">サウンドボード</string>
     <string name="sounds_stop">すべて停止</string>
     <string name="notif_title">LarmaMic が送信中です</string>

@@ -86,6 +86,9 @@ val SECTIONS = listOf(
         listOf(
             SliderCtl("fx_pitch", R.string.ctl_pitch, R.string.ctl_pitch_hint, -12, 12, unitRes = R.string.unit_semitones),
             SliderCtl("fx_reverb", R.string.ctl_reverb, null, 0, 100, "%"),
+            SliderCtl("fx_echo", R.string.ctl_echo, null, 0, 100, "%"),
+            SliderCtl("fx_chorus", R.string.ctl_chorus, null, 0, 100, "%"),
+            SliderCtl("fx_dist", R.string.ctl_dist, null, 0, 100, "%"),
             SwitchCtl("fx_robot", R.string.ctl_robot),
         ),
     ),

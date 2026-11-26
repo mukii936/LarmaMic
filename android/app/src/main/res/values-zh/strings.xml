@@ -90,6 +90,9 @@
     <string name="ctl_robot">机器人声</string>
     <string name="lang_title">语言</string>
     <string name="lang_auto">自动</string>
+    <string name="ctl_echo">回声</string>
+    <string name="ctl_chorus">合唱（加倍）</string>
+    <string name="ctl_dist">失真</string>
     <string name="sounds_title">音效板</string>
     <string name="sounds_stop">全部停止</string>
     <string name="notif_title">LarmaMic 正在传送声音</string>

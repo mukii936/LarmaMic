@@ -1336,23 +1336,51 @@ fn section_eq(ui: &mut Ui, p: &mut Params) {
 }
 
 /// Giọng đổi sẵn: ghép từ các hiệu ứng có sẵn (đổi tông, vang, robot).
-const VOICES: [(&str, f32, f32, bool); 5] = [
-    ("fx.none", 0.0, 0.0, false),
-    ("fx.deep", -5.0, 0.0, false),
-    ("fx.small", 7.0, 0.0, false),
-    ("fx.robot", 0.0, 0.0, true),
-    ("fx.ghost", -2.0, 65.0, false),
+struct Voice {
+    key: &'static str,
+    pitch: f32,
+    reverb: f32,
+    robot: bool,
+    echo: f32,
+    chorus: f32,
+    dist: f32,
+    band: u8,
+}
+const fn voice(key: &'static str, pitch: f32, reverb: f32, robot: bool, echo: f32, chorus: f32, dist: f32, band: u8) -> Voice {
+    Voice { key, pitch, reverb, robot, echo, chorus, dist, band }
+}
+const VOICES: [Voice; 10] = [
+    voice("fx.none", 0.0, 0.0, false, 0.0, 0.0, 0.0, 0),
+    voice("fx.deep", -5.0, 0.0, false, 0.0, 0.0, 0.0, 0),
+    voice("fx.small", 7.0, 0.0, false, 0.0, 0.0, 0.0, 0),
+    voice("fx.robot", 0.0, 0.0, true, 0.0, 0.0, 0.0, 0),
+    voice("fx.ghost", -2.0, 65.0, false, 35.0, 0.0, 0.0, 0),
+    voice("fx.alien", 4.0, 20.0, true, 0.0, 40.0, 0.0, 0),
+    voice("fx.monster", -9.0, 25.0, false, 0.0, 0.0, 35.0, 0),
+    voice("fx.cave", 0.0, 85.0, false, 45.0, 0.0, 0.0, 0),
+    voice("fx.radio", 0.0, 0.0, false, 0.0, 0.0, 15.0, 1),
+    voice("fx.megaphone", 0.0, 0.0, false, 0.0, 0.0, 40.0, 2),
 ];
 
 fn section_fx(ui: &mut Ui, p: &mut Params) {
     heading(ui, &t("sec.fx"), &t("sec.fx.lead"));
     ui.horizontal_wrapped(|ui| {
-        for (key, pitch, reverb, robot) in VOICES {
-            let on = p.fx_pitch == pitch && p.fx_reverb == reverb && p.fx_robot == robot;
-            if ui.selectable_label(on, t(key)).clicked() {
-                p.fx_pitch = pitch;
-                p.fx_reverb = reverb;
-                p.fx_robot = robot;
+        for v in VOICES.iter() {
+            let on = p.fx_pitch == v.pitch
+                && p.fx_reverb == v.reverb
+                && p.fx_robot == v.robot
+                && p.fx_echo == v.echo
+                && p.fx_chorus == v.chorus
+                && p.fx_dist == v.dist
+                && p.fx_band == v.band;
+            if ui.selectable_label(on, t(v.key)).clicked() {
+                p.fx_pitch = v.pitch;
+                p.fx_reverb = v.reverb;
+                p.fx_robot = v.robot;
+                p.fx_echo = v.echo;
+                p.fx_chorus = v.chorus;
+                p.fx_dist = v.dist;
+                p.fx_band = v.band;
             }
         }
     });
@@ -1362,6 +1390,17 @@ fn section_fx(ui: &mut Ui, p: &mut Params) {
         ui.label(RichText::new(t("fx.latency")).small().color(MUTE));
     }
     ctl(ui, &t("ctl.reverb"), "", &mut p.fx_reverb, 0.0..=100.0, "%");
+    ctl(ui, &t("ctl.echo"), "", &mut p.fx_echo, 0.0..=100.0, "%");
+    ctl(ui, &t("ctl.chorus"), "", &mut p.fx_chorus, 0.0..=100.0, "%");
+    ctl(ui, &t("ctl.dist"), "", &mut p.fx_dist, 0.0..=100.0, "%");
+    ui.horizontal_wrapped(|ui| {
+        ui.label(t("fx.band"));
+        for (v, key) in [(0u8, "fx.band.none"), (1, "fx.band.phone"), (2, "fx.band.mega")] {
+            if ui.selectable_label(p.fx_band == v, t(key)).clicked() {
+                p.fx_band = v;
+            }
+        }
+    });
     ui.add_space(6.0);
     switch_row(ui, &t("ctl.robot"), "", &mut p.fx_robot);
 }

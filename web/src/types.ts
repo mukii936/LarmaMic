@@ -22,6 +22,10 @@ export interface Params {
   fx_pitch: number;
   fx_reverb: number;
   fx_robot: boolean;
+  fx_echo: number;
+  fx_chorus: number;
+  fx_dist: number;
+  fx_band: number;
 }
 
 export type NumKey = { [K in keyof Params]: Params[K] extends number ? K : never }[keyof Params];
@@ -54,6 +58,7 @@ export const PREVIEW_PARAMS: Params = {
   ai: true, ai_mix: 85, gate_on: true, thr: -52, depth: 40, hp: 100, low: -1, mud: -3, pres: 3,
   air: 1, comp: 40, gain: 6, buf_ms: 60, mute: false, monitor: false,
   agc: false, aec: false, fx_pitch: 0, fx_reverb: 0, fx_robot: false,
+  fx_echo: 0, fx_chorus: 0, fx_dist: 0, fx_band: 0,
 };
 export const PREVIEW_METER: MeterData = {
   in: -38, out: -14, gate: true, buf: 60, under: 0, drops: 0, cal: 0, calp: 0, caln: -99, lat: 96,
@@ -133,6 +138,9 @@ export const SECTIONS: SectionDef[] = [
     items: [
       { kind: 'slider', key: 'fx_pitch', label: 'ctl.pitch', hint: 'ctl.pitch.hint', min: -12, max: 12, unit: '', unitKey: 'unit.semitones' },
       { kind: 'slider', key: 'fx_reverb', label: 'ctl.reverb', min: 0, max: 100, unit: '%' },
+      { kind: 'slider', key: 'fx_echo', label: 'ctl.echo', min: 0, max: 100, unit: '%' },
+      { kind: 'slider', key: 'fx_chorus', label: 'ctl.chorus', min: 0, max: 100, unit: '%' },
+      { kind: 'slider', key: 'fx_dist', label: 'ctl.dist', min: 0, max: 100, unit: '%' },
       { kind: 'switch', key: 'fx_robot', label: 'ctl.robot' },
     ],
   },

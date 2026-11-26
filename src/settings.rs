@@ -30,6 +30,10 @@ pub struct Params {
     pub fx_pitch: f32,  // đổi tông, bán cung -12..12
     pub fx_reverb: f32, // vang 0..100 %
     pub fx_robot: bool, // giọng robot
+    pub fx_echo: f32,   // vọng lặp (echo/delay) 0..100 %
+    pub fx_chorus: f32, // nhân đôi giọng (chorus) 0..100 %
+    pub fx_dist: f32,   // méo tiếng 0..100 %
+    pub fx_band: u8,    // bộ lọc dải: 0 không, 1 điện thoại, 2 loa phóng thanh
 }
 
 impl Default for Params {
@@ -57,6 +61,10 @@ impl Params {
         self.buf_ms = c(self.buf_ms, 30.0, 300.0);
         self.fx_pitch = c(self.fx_pitch, -12.0, 12.0).round();
         self.fx_reverb = c(self.fx_reverb, 0.0, 100.0);
+        self.fx_echo = c(self.fx_echo, 0.0, 100.0);
+        self.fx_chorus = c(self.fx_chorus, 0.0, 100.0);
+        self.fx_dist = c(self.fx_dist, 0.0, 100.0);
+        self.fx_band = self.fx_band.min(2);
         self
     }
 }
@@ -73,7 +81,7 @@ pub fn preset(name: &str) -> Params {
     let base = Params {
         ai: true, ai_mix: 85.0, gate_on: true, thr: -52.0, depth: 40.0, hp: 100.0,
         low: -1.0, mud: -3.0, pres: 3.0, air: 1.0, comp: 40.0, gain: 6.0, buf_ms: 60.0,
-        mute: false, monitor: false, agc: false, aec: false, fx_pitch: 0.0, fx_reverb: 0.0, fx_robot: false,
+        mute: false, monitor: false, agc: false, aec: false, fx_pitch: 0.0, fx_reverb: 0.0, fx_robot: false, fx_echo: 0.0, fx_chorus: 0.0, fx_dist: 0.0, fx_band: 0,
     };
     match name {
         "game" => Params {
@@ -103,6 +111,10 @@ pub fn apply_preset(cur: &Params, name: &str) -> Params {
         fx_pitch: cur.fx_pitch,
         fx_reverb: cur.fx_reverb,
         fx_robot: cur.fx_robot,
+        fx_echo: cur.fx_echo,
+        fx_chorus: cur.fx_chorus,
+        fx_dist: cur.fx_dist,
+        fx_band: cur.fx_band,
         ..preset(name)
     }
 }
