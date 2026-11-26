@@ -143,6 +143,10 @@ pub struct Saved {
     pub lang: String,
     /// Cách điện thoại nối tới PC: "wifi" (mặc định), "usb" hoặc "bt". Quyết định địa chỉ nào đứng đầu trong QR.
     pub conn_mode: String,
+    /// Nhiều điện thoại: true = chỉ lấy máy đang nói to nhất (mặc định trộn tất cả).
+    pub mix_loudest: bool,
+    /// true = không cho điện thoại tự tìm thấy PC (không quảng bá mDNS, từ chối xin ghép nối).
+    pub no_discovery: bool,
     /// Khóa dịch của ghi chú về lần đọc cài đặt này (không lưu ra file), ví dụ "note.backup".
     #[serde(skip)]
     pub note: String,

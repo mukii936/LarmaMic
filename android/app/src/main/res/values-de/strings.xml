@@ -106,5 +106,16 @@
     <string name="mode_wifi_hint">Handy und PC müssen im selben WLAN sein.</string>
     <string name="mode_usb_hint">Kabel am PC anschließen, dann am Handy USB-Debugging aktivieren (wird automatisch erkannt) oder USB-Tethering (Netzwerk &gt; Hotspot und Tethering). Kein WLAN nötig.</string>
     <string name="mode_bt_hint">Handy und PC in den Bluetooth-Einstellungen koppeln, auf dem Handy Bluetooth-Tethering aktivieren, am PC dessen Netzwerk beitreten und den QR-Code scannen. Langsamer als WLAN: Audio wird mit 24 kHz gesendet.</string>
+    <string name="notif_mute">Stumm</string>
+    <string name="notif_unmute">Ton an</string>
+    <string name="vol_title">Lautstärketasten schalten das Mikrofon stumm</string>
+    <string name="vol_hint">Lautstärketaste drücken, um stumm zu schalten oder aufzuheben, auch bei ausgeschaltetem Bildschirm. Gilt ab dem nächsten Start.</string>
+    <string name="tile_label">Mikrofon stumm</string>
+    <string name="nearby_title">PCs in der Nähe</string>
+    <string name="nearby_none">Suche nach PCs in diesem Netzwerk…</string>
+    <string name="nearby_wait">Warte darauf, dass du dieses Handy auf „%1$s“ zulässt…</string>
+    <string name="nearby_refused">Der PC hat abgelehnt oder nicht rechtzeitig geantwortet.</string>
+    <string name="hear_title">Mich selbst hören (Kopfhörer)</string>
+    <string name="hear_hint">Spielt deine bearbeitete Stimme auf diesem Handy ab. Nutze Kopfhörer, sonst gibt es Rückkopplung. Über Bluetooth nicht verfügbar.</string>
     <string name="err_addr">Scanne zuerst den QR-Code oder füge die in LarmaMic angezeigte Adresse ein.</string>
 </resources>

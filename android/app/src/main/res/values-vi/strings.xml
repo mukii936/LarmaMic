@@ -106,5 +106,16 @@
     <string name="mode_wifi_hint">Điện thoại và PC phải cùng Wi-Fi.</string>
     <string name="mode_usb_hint">Cắm cáp vào PC, rồi bật Gỡ lỗi USB trên điện thoại (tự nhận) hoặc bật Chia sẻ kết nối qua USB (Mạng &gt; Điểm phát sóng và chia sẻ). Không cần Wi-Fi.</string>
     <string name="mode_bt_hint">Ghép đôi điện thoại với PC trong cài đặt Bluetooth, bật chia sẻ kết nối qua Bluetooth trên điện thoại và vào mạng đó trên PC, rồi quét mã QR. Chậm hơn Wi-Fi: âm thanh gửi ở 24 kHz.</string>
+    <string name="notif_mute">Tắt tiếng</string>
+    <string name="notif_unmute">Bật tiếng</string>
+    <string name="vol_title">Phím âm lượng tắt/bật tiếng mic</string>
+    <string name="vol_hint">Nhấn nút âm lượng để tắt/bật tiếng, kể cả khi tắt màn hình. Có hiệu lực từ lần bật sau.</string>
+    <string name="tile_label">Tắt tiếng mic</string>
+    <string name="nearby_title">PC gần đây</string>
+    <string name="nearby_none">Đang tìm PC trong mạng này…</string>
+    <string name="nearby_wait">Đang chờ bạn cho phép điện thoại này trên “%1$s”…</string>
+    <string name="nearby_refused">PC đã từ chối hoặc không trả lời kịp.</string>
+    <string name="hear_title">Nghe lại giọng mình (tai nghe)</string>
+    <string name="hear_hint">Phát lại giọng đã xử lý trên điện thoại này. Hãy đeo tai nghe, nếu không sẽ bị hú. Không dùng được qua Bluetooth.</string>
     <string name="err_addr">Hãy quét mã QR trước, hoặc dán địa chỉ hiện trong LarmaMic.</string>
 </resources>

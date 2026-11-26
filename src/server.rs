@@ -83,6 +83,10 @@ struct Msg {
     ts: Option<u64>,
     /// Tên thiết bị trong tin "hello" (ví dụ "Pixel 7"), hiện trong danh sách thiết bị trên PC.
     device: Option<String>,
+    /// "adpcm" = âm thanh nén IMA ADPCM (app Android ở chế độ Bluetooth); mặc định PCM 16-bit.
+    codec: Option<String>,
+    /// Cho tin "talkback": true = gửi ngược tiếng đã xử lý về điện thoại này.
+    on: Option<bool>,
 }
 
 /// So sánh hai chuỗi trong thời gian không phụ thuộc vị trí khác biệt.
@@ -112,11 +116,77 @@ async fn deny(mut sock: WebSocket) {
     let _ = sock.send(Message::Close(None)).await;
 }
 
+/// Ghép nối không cần quét QR: điện thoại tìm thấy PC qua mDNS rồi gửi {"t":"pair","device":"..."}.
+/// PC hiện hộp Cho phép / Từ chối; được phép thì gửi mã ghép nối qua kết nối TLS này. Có giới hạn tốc độ để không bị làm phiền.
+async fn pair_route(ws: WebSocketUpgrade, State(sh): State<Arc<Shared>>) -> Response {
+    ws.on_upgrade(move |sock| pair_handle(sock, sh))
+}
+
+async fn pair_handle(mut sock: WebSocket, sh: Arc<Shared>) {
+    use crate::engine::PairReq;
+    async fn say(sock: &mut WebSocket, t: &str) {
+        let _ = sock.send(Message::Text(format!("{{\"t\":\"{t}\"}}").into())).await;
+        let _ = sock.send(Message::Close(None)).await;
+    }
+    if !sh.discovery.load(Relaxed) {
+        return say(&mut sock, "refused").await;
+    }
+    let first = tokio::time::timeout(Duration::from_secs(5), sock.recv()).await;
+    let Ok(Some(Ok(Message::Text(text)))) = first else { return };
+    let Ok(m) = serde_json::from_str::<Msg>(text.as_str()) else { return };
+    if m.t != "pair" {
+        return;
+    }
+    let device: String = m.device.unwrap_or_default().trim().chars().take(32).collect();
+    let device = if device.is_empty() { t("src.default").replace("{0}", "?") } else { device };
+    let busy = {
+        let mut last = sh.last_pair.lock();
+        let busy = sh.pending.lock().len() >= 2 || last.is_some_and(|l| l.elapsed() < Duration::from_secs(5));
+        if !busy {
+            *last = Some(Instant::now());
+        }
+        busy
+    };
+    if busy {
+        return say(&mut sock, "busy").await;
+    }
+    let req = Arc::new(PairReq { device, decision: std::sync::atomic::AtomicU8::new(0) });
+    sh.pending.lock().push(req.clone());
+    crate::win::show_main();
+    crate::win::beep(false);
+    sh.wake_ui();
+    let started = Instant::now();
+    let result = loop {
+        let d = req.decision.load(Relaxed);
+        if d != 0 {
+            break d;
+        }
+        if started.elapsed() > Duration::from_secs(60) {
+            break 2;
+        }
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_millis(250)) => {}
+            m = sock.recv() => { if matches!(m, None | Some(Err(_)) | Some(Ok(Message::Close(_)))) { break 2 } }
+        }
+    };
+    sh.pending.lock().retain(|r| !Arc::ptr_eq(r, &req));
+    sh.wake_ui();
+    if result == 1 {
+        let token = sh.token.read().clone();
+        let _ = sock.send(Message::Text(json!({ "t": "granted", "token": token }).to_string().into())).await;
+        let _ = sock.send(Message::Close(None)).await;
+    } else {
+        say(&mut sock, "refused").await;
+    }
+}
+
 async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
     // Nhiều điện thoại nối cùng lúc: mỗi kết nối có một Source riêng (tạo khi nhận "hello").
     // conn_gen chỉ đổi khi đổi mã ghép nối: lúc đó mọi kết nối cũ phải thoát.
     let epoch = sh.conn_gen.load(SeqCst);
     let mut src: Option<Arc<crate::engine::Source>> = None;
+    let mut adpcm = false;
+    let mut talk_rx: Option<tokio::sync::broadcast::Receiver<Vec<i16>>> = None;
     let mut rs: Option<Resampler> = None;
     let mut buf: Vec<f32> = Vec::with_capacity(2048);
     let mut ready = false;
@@ -147,6 +217,7 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                             "hello" => {
                                 let rate = m.rate.unwrap_or(48_000).clamp(8_000, 192_000);
                                 rs = (rate != 48_000).then(|| Resampler::new(rate, 48_000));
+                                adpcm = m.codec.as_deref() == Some("adpcm");
                                 if src.is_none() {
                                     let name = m.device.clone().filter(|d| !d.trim().is_empty()).map(|d| d.trim().chars().take(32).collect::<String>());
                                     let name = name.unwrap_or_else(|| tf("src.default", &[&(sh.sources.lock().len() + 1).to_string()]));
@@ -160,6 +231,10 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                                 if let Some(p) = m.p {
                                     sh.merge_json(&p);
                                 }
+                            }
+                            "talkback" => {
+                                // nghe lại giọng mình sau khi xử lý (nên đeo tai nghe); không dùng với ADPCM/Bluetooth
+                                talk_rx = if m.on.unwrap_or(false) && !adpcm { Some(sh.talk.subscribe()) } else { None };
                             }
                             "calibrate" => {
                                 sh.cal_req.store(true, Relaxed);
@@ -189,10 +264,13 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                     }
                     Message::Binary(b) => {
                         buf.clear();
-                        let raw: Vec<f32> = b
-                            .chunks_exact(2)
-                            .map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0)
-                            .collect();
+                        let raw: Vec<f32> = if adpcm {
+                            let mut v = Vec::with_capacity(b.len() * 2);
+                            crate::adpcm::decode(&b, &mut v);
+                            v
+                        } else {
+                            b.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]]) as f32 / 32768.0).collect()
+                        };
                         match rs.as_mut() {
                             Some(r) => r.process(&raw, &mut buf),
                             None => buf.extend_from_slice(&raw),
@@ -203,6 +281,24 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
                     }
                     Message::Close(_) => { why = t("srv.why.closecmd"); break }
                     _ => {}
+                }
+            }
+            frame = async {
+                match talk_rx.as_mut() {
+                    Some(r) => r.recv().await,
+                    None => std::future::pending().await,
+                }
+            } => {
+                match frame {
+                    Ok(v) => {
+                        let bytes: Vec<u8> = v.iter().flat_map(|s| s.to_le_bytes()).collect();
+                        if sock.send(Message::Binary(bytes.into())).await.is_err() {
+                            why = t("srv.why.closed");
+                            break;
+                        }
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+                    Err(_) => talk_rx = None,
                 }
             }
             _ = tick.tick() => {
@@ -261,6 +357,18 @@ async fn handle(mut sock: WebSocket, sh: Arc<Shared>) {
         sh.remove_source(s.id);
     }
     sh.wake_ui();
+}
+
+/// Đăng ký dịch vụ mDNS `_larmamic._tcp`. Bộ chạy nền được giữ sống suốt đời tiến trình.
+fn advertise(port: u16) {
+    use mdns_sd::{ServiceDaemon, ServiceInfo};
+    let host = std::env::var("COMPUTERNAME").unwrap_or_else(|_| "PC".to_string());
+    let Ok(daemon) = ServiceDaemon::new() else { return };
+    let props = [("v", "1")];
+    if let Ok(info) = ServiceInfo::new("_larmamic._tcp.local.", &format!("LarmaMic {host}"), &format!("{host}.local."), "", port, &props[..]) {
+        let _ = daemon.register(info.enable_addr_auto());
+    }
+    std::mem::forget(daemon);
 }
 
 fn load_or_make_cert(ip: &str) -> Result<(String, String), String> {
@@ -363,8 +471,13 @@ async fn run(sh: Arc<Shared>) -> Result<(), String> {
         .route("/icon-512.png", get(|| async { png(ICON_512) }))
         .route("/manifest.webmanifest", get(manifest_route))
         .route("/ws", get(ws_route))
+        .route("/pair", get(pair_route))
         .with_state(sh.clone());
 
+    // quảng bá trong mạng (mDNS) để app Android tự tìm thấy PC; tắt được bằng ô chọn trong app
+    if sh.discovery.load(Relaxed) {
+        advertise(port);
+    }
     *sh.url.lock() = format!("https://{ip}:{port}");
     axum_server::bind_rustls(SocketAddr::new("0.0.0.0".parse().unwrap(), port), cfg)
         .serve(app.into_make_service())

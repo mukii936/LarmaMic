@@ -15,7 +15,7 @@
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat&logo=windows&logoColor=white">
   <img alt="Languages" src="https://img.shields.io/badge/languages-10-38e0c8?style=flat">
   <a href="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml"><img alt="Build" src="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml/badge.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-0.5.0-946ce6?style=flat">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.6.0-946ce6?style=flat">
 
   <br><br>
 
@@ -29,6 +29,10 @@
 
 - Dùng **iPhone** mà không cài gì (quét mã QR rồi mở trang bằng Safari), hoặc **app Android** riêng, vẫn truyền tiếp khi tắt màn hình.
 - **Nhiều điện thoại cùng lúc** (tối đa 4, iPhone hay Android đều được): tiếng của các máy được trộn vào một mic ảo duy nhất. App PC liệt kê từng máy với mức tiếng và cho tắt tiếng hoặc ngắt riêng từng máy. Nút tắt tiếng và giữ-để-nói tác động lên cả hỗn hợp.
+- **Android không cần quét QR:** app tự tìm PC trong mạng và xin ghép nối; bạn bấm **Cho phép** trên PC (tắt được). Qua cáp USB có bật gỡ lỗi USB thì chỉ cần cắm cáp.
+- **Trộn linh hoạt hơn:** thanh độ lợi riêng cho từng điện thoại, và chế độ **Chỉ người nói to nhất** (thay vì trộn tất cả). Khi ghi âm với từ 2 máy trở lên, mỗi máy còn được lưu thành một track riêng.
+- **Thêm cho Android:** nút âm lượng tắt/bật tiếng mic kể cả khi tắt màn hình, nút Tắt tiếng trong thông báo và ô cài đặt nhanh, và **Nghe lại giọng mình** (giọng đã xử lý phát lại trên điện thoại, nên đeo tai nghe).
+- **Bluetooth có nén âm thanh** (IMA ADPCM, 4:1) nên nghe tốt hơn âm thanh 24 kHz thường trên đường truyền chậm.
 - Ba cách kết nối: **Wi-Fi**, **cáp USB** (chia sẻ mạng USB) và **Bluetooth** (chia sẻ mạng Bluetooth). Mã QR chứa mọi địa chỉ của PC, điện thoại tự thử lần lượt.
 - Chỉ một file `larma-mic.exe` chạy ngay (khoảng 9 MB, không trình cài, không cần runtime). Khi thu vào khay hệ thống, app dùng ≈ 0% CPU và khoảng 4 MB RAM.
 - Xử lý giọng ở 48 kHz: khử ồn AI ([RNNoise](https://jmvalin.ca/demo/rnnoise/)), cắt tiếng ù, cổng ồn nhìn trước 5 ms, EQ 4 dải, tự cân âm lượng (AGC), nén giọng, âm lượng và bộ chống vỡ tiếng −3 dB.
@@ -133,9 +137,16 @@ APK ký bằng khóa debug để cài trực tiếp được; không dành cho P
 - App Android: Kotlin, Jetpack Compose, OkHttp, AudioRecord trong dịch vụ nền
 - Giao thức: PCM 16-bit thô qua WebSocket, kèm các tin JSON nhỏ cho thông số và số đo
 
+## Đóng gói
+
+- Đưa lên winget: xem [docs/WINGET.md](docs/WINGET.md) (manifest đã có sẵn trong `packaging/winget`).
+- Bỏ cảnh báo SmartScreen bằng ký số: xem [docs/SIGNING.md](docs/SIGNING.md).
+
 ## Kế hoạch
 
-- Ký số cho file exe
+- Ký số cho file exe (cần chứng chỉ của bạn hoặc đơn đăng ký SignPath)
+- Khử vọng (echo)
+- Opus thay cho ADPCM ở Bluetooth
 - App Android chưa được thử trên máy thật; mong bạn báo lỗi về âm thanh, kết nối hoặc dịch vụ nền
 - Liên kết Bluetooth gốc (RFCOMM) không cần chia sẻ mạng
 - App desktop cho macOS và Linux

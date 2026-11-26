@@ -106,5 +106,16 @@
     <string name="mode_wifi_hint">Телефон и ПК должны быть в одной сети Wi-Fi.</string>
     <string name="mode_usb_hint">Подключите кабель к ПК, затем включите на телефоне отладку по USB (определится автоматически) или USB-модем (Сеть &gt; Точка доступа и модем). Wi-Fi не нужен.</string>
     <string name="mode_bt_hint">Сопрягите телефон с ПК в настройках Bluetooth, включите Bluetooth-модем на телефоне, подключитесь к его сети на ПК и отсканируйте QR-код. Медленнее Wi-Fi: звук передаётся на 24 кГц.</string>
+    <string name="notif_mute">Выкл. звук</string>
+    <string name="notif_unmute">Вкл. звук</string>
+    <string name="vol_title">Кнопки громкости отключают микрофон</string>
+    <string name="vol_hint">Нажмите кнопку громкости, чтобы отключить или включить звук, даже при выключенном экране. Вступает в силу при следующем запуске.</string>
+    <string name="tile_label">Микрофон выкл.</string>
+    <string name="nearby_title">ПК поблизости</string>
+    <string name="nearby_none">Поиск ПК в этой сети…</string>
+    <string name="nearby_wait">Ожидание: разрешите этот телефон на «%1$s»…</string>
+    <string name="nearby_refused">ПК отклонил запрос или не ответил вовремя.</string>
+    <string name="hear_title">Слышать себя (наушники)</string>
+    <string name="hear_hint">Воспроизводит обработанный голос на этом телефоне. Используйте наушники, иначе будет свист. Недоступно по Bluetooth.</string>
     <string name="err_addr">Сначала отсканируйте QR-код или вставьте адрес, показанный в LarmaMic.</string>
 </resources>

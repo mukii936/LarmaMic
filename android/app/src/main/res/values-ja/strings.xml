@@ -106,5 +106,16 @@
     <string name="mode_wifi_hint">スマートフォンと PC が同じ Wi-Fi に接続されている必要があります。</string>
     <string name="mode_usb_hint">ケーブルを PC に接続し、スマートフォンで USB デバッグをオン（自動認識）にするか、USB テザリング（ネットワーク &gt; アクセスポイントとテザリング）をオンにします。Wi-Fi は不要です。</string>
     <string name="mode_bt_hint">Bluetooth 設定でスマートフォンと PC をペアリングし、スマートフォンで Bluetooth テザリングをオンにして PC でそのネットワークに参加し、QR コードをスキャンします。Wi-Fi より遅く、音声は 24 kHz で送信されます。</string>
+    <string name="notif_mute">ミュート</string>
+    <string name="notif_unmute">ミュート解除</string>
+    <string name="vol_title">音量キーでマイクをミュート</string>
+    <string name="vol_hint">音量ボタンでミュート／解除できます。画面が消えていても有効です。次回の開始から反映されます。</string>
+    <string name="tile_label">マイクをミュート</string>
+    <string name="nearby_title">近くの PC</string>
+    <string name="nearby_none">このネットワーク上の PC を検索中…</string>
+    <string name="nearby_wait">「%1$s」でこのスマートフォンを許可するのを待っています…</string>
+    <string name="nearby_refused">PC が拒否したか、時間内に応答しませんでした。</string>
+    <string name="hear_title">自分の声をモニター（ヘッドホン）</string>
+    <string name="hear_hint">処理後の声をこのスマートフォンで再生します。ヘッドホンを使わないとハウリングします。Bluetooth では使えません。</string>
     <string name="err_addr">先に QR コードをスキャンするか、LarmaMic に表示されたアドレスを貼り付けてください。</string>
 </resources>

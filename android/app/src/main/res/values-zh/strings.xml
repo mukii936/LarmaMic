@@ -106,5 +106,16 @@
     <string name="mode_wifi_hint">手机和电脑必须在同一 Wi-Fi 下。</string>
     <string name="mode_usb_hint">把数据线接到电脑，然后在手机上开启 USB 调试（自动识别），或开启 USB 网络共享（网络 &gt; 热点和网络共享）。无需 Wi-Fi。</string>
     <string name="mode_bt_hint">在蓝牙设置中配对手机和电脑，在手机上开启蓝牙网络共享并在电脑上加入该网络，然后扫描二维码。比 Wi-Fi 慢：音频以 24 kHz 发送。</string>
+    <string name="notif_mute">静音</string>
+    <string name="notif_unmute">取消静音</string>
+    <string name="vol_title">音量键切换麦克风静音</string>
+    <string name="vol_hint">按音量键即可静音或取消静音，息屏时也有效。下次启动时生效。</string>
+    <string name="tile_label">麦克风静音</string>
+    <string name="nearby_title">附近的电脑</string>
+    <string name="nearby_none">正在此网络中搜索电脑…</string>
+    <string name="nearby_wait">正在等待你在“%1$s”上允许此手机…</string>
+    <string name="nearby_refused">电脑已拒绝或未及时回应。</string>
+    <string name="hear_title">监听自己的声音（耳机）</string>
+    <string name="hear_hint">在这部手机上回放处理后的声音。请使用耳机，否则会产生啸叫。蓝牙模式下不可用。</string>
     <string name="err_addr">请先扫描二维码，或粘贴 LarmaMic 中显示的地址。</string>
 </resources>

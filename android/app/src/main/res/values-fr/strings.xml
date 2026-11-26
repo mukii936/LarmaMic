@@ -106,5 +106,16 @@
     <string name="mode_wifi_hint">Le téléphone et le PC doivent être sur le même Wi-Fi.</string>
     <string name="mode_usb_hint">Branchez le câble au PC, puis activez le débogage USB sur le téléphone (détection automatique) ou le partage de connexion USB (Réseau &gt; Point d’accès et partage). Pas besoin de Wi-Fi.</string>
     <string name="mode_bt_hint">Appairez le téléphone au PC dans les réglages Bluetooth, activez le partage de connexion Bluetooth sur le téléphone et rejoignez son réseau sur le PC, puis scannez le QR code. Plus lent que le Wi-Fi : l’audio est envoyé à 24 kHz.</string>
+    <string name="notif_mute">Couper le son</string>
+    <string name="notif_unmute">Réactiver le son</string>
+    <string name="vol_title">Les touches de volume coupent le micro</string>
+    <string name="vol_hint">Appuyez sur une touche de volume pour couper ou réactiver le son, même écran éteint. Pris en compte au prochain démarrage.</string>
+    <string name="tile_label">Couper le micro</string>
+    <string name="nearby_title">PC à proximité</string>
+    <string name="nearby_none">Recherche de PC sur ce réseau…</string>
+    <string name="nearby_wait">En attente de votre autorisation pour ce téléphone sur « %1$s »…</string>
+    <string name="nearby_refused">Le PC a refusé ou n’a pas répondu à temps.</string>
+    <string name="hear_title">M’entendre (casque)</string>
+    <string name="hear_hint">Rejoue votre voix traitée sur ce téléphone. Utilisez un casque, sinon vous aurez un larsen. Indisponible en Bluetooth.</string>
     <string name="err_addr">Scannez d’abord le QR code, ou collez l’adresse affichée par LarmaMic.</string>
 </resources>

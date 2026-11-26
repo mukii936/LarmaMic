@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod adb;
+mod adpcm;
 mod diag;
 mod dsp;
 mod engine;
@@ -53,6 +54,8 @@ fn main() -> eframe::Result<()> {
     i18n::set(i18n::resolve(&saved.lang)); // "auto"/rỗng thì theo ngôn ngữ của Windows
     let shared = engine::Shared::new(saved.params, saved.token.clone());
     shared.beep.store(!saved.no_beep, Relaxed);
+    shared.mix_loudest.store(saved.mix_loudest, Relaxed);
+    shared.discovery.store(!saved.no_discovery, Relaxed);
     *shared.profiles.write() = saved.profiles.clone();
     *shared.settings_note.lock() = saved.note.clone();
     let tx = engine::spawn_audio_manager(shared.clone());

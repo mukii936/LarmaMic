@@ -101,6 +101,14 @@ class MainActivity : AppCompatActivity() {
             // Started by the PC over the cable: connect straight away
             LaunchedEffect(linked) { if (linked > 0) begin() }
 
+            var pairing by remember { mutableStateOf<String?>(null) }
+            val acceptConn = { c: Connection ->
+                store.connection = c
+                conn = c
+                inputError = null
+                begin()
+            }
+
             val accept = { text: String, fresh: Boolean ->
                 val c = Connection.parse(text)
                 if (c == null) {
@@ -137,6 +145,16 @@ class MainActivity : AppCompatActivity() {
                 onScan = { scan() },
                 onAddress = { accept(it, true) },
                 onForget = { c -> Engine.forgetPin(c); store.connection = null; conn = null },
+                pairing = pairing,
+                onPair = { pc ->
+                    pairing = pc.label
+                    Engine.pair(pc) { c ->
+                        runOnUiThread {
+                            pairing = null
+                            if (c != null) acceptConn(c) else inputError = Msg(R.string.nearby_refused)
+                        }
+                    }
+                },
             )
         }
     }

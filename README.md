@@ -15,7 +15,7 @@
   <img alt="Windows" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?style=flat&logo=windows&logoColor=white">
   <img alt="Languages" src="https://img.shields.io/badge/languages-10-38e0c8?style=flat">
   <a href="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml"><img alt="Build" src="https://github.com/mukii936/LarmaMic/actions/workflows/build.yml/badge.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-0.5.0-946ce6?style=flat">
+  <img alt="Version" src="https://img.shields.io/badge/version-0.6.0-946ce6?style=flat">
 
   <br><br>
 
@@ -29,6 +29,10 @@
 
 - Use an **iPhone** with nothing to install (scan the QR code and open the page in Safari), or the native **Android app** that keeps streaming with the screen off.
 - **Several phones at once** (up to 4, any mix of iPhone and Android): their voices are mixed into the one virtual microphone. The PC app lists each phone with its level and lets you mute or disconnect it. The mute switch and push-to-talk affect the whole mix.
+- **No QR code needed on Android:** the app finds the PC on the network and asks to pair; you tap **Allow** on the PC (can be turned off). Over a USB cable with USB debugging, plugging in is enough.
+- **More mixing control:** a gain slider per phone, and a **Loudest only** mode that follows whoever talks (instead of mixing everyone). Recording also saves each phone as its own track when two or more are connected.
+- **Android extras:** volume buttons mute/unmute the mic even with the screen off, a Mute button in the notification and a Quick Settings tile, and **Hear myself** (the processed voice played back on the phone, use headphones).
+- **Bluetooth uses compression** (IMA ADPCM, 4:1) so it sounds better than plain 24 kHz audio on a slow link.
 - Three ways to connect: **Wi-Fi**, **USB cable** (USB tethering) and **Bluetooth** (Bluetooth tethering). The QR code carries every address of the PC, and the phone tries them in turn.
 - Run a single portable `larma-mic.exe` (about 9 MB, no installer, no runtime). It sits in the system tray with ≈ 0% CPU and about 4 MB of RAM while hidden.
 - Clean the voice with a processing chain at 48 kHz: AI noise removal ([RNNoise](https://jmvalin.ca/demo/rnnoise/)), rumble filter, noise gate with 5 ms lookahead, 4-band equalizer, auto level (AGC), compressor, volume and a −3 dB limiter.
@@ -133,9 +137,16 @@ The APK is signed with the debug key so it can be installed directly; it is not 
 - Android app: Kotlin, Jetpack Compose, OkHttp, AudioRecord in a foreground service
 - Protocol: raw 16-bit PCM over a WebSocket plus small JSON messages for parameters and meters
 
+## Packaging
+
+- Publishing to winget: see [docs/WINGET.md](docs/WINGET.md) (manifests are ready in `packaging/winget`).
+- Removing the SmartScreen warning with code signing: see [docs/SIGNING.md](docs/SIGNING.md).
+
 ## Roadmap
 
-- Code signing for the exe
+- Code signing for the exe (needs your certificate or a SignPath application)
+- Acoustic echo cancellation
+- Opus instead of ADPCM for Bluetooth
 - The Android app has not been tested on a real device yet; please report problems with audio, connection or the foreground service
 - A native Bluetooth (RFCOMM) link without tethering
 - macOS and Linux desktop apps

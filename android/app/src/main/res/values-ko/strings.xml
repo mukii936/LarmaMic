@@ -106,5 +106,16 @@
     <string name="mode_wifi_hint">휴대폰과 PC가 같은 Wi-Fi에 있어야 합니다.</string>
     <string name="mode_usb_hint">케이블을 PC에 연결한 다음 휴대폰에서 USB 디버깅을 켜거나(자동 인식) USB 테더링을 켜세요(네트워크 &gt; 핫스팟 및 테더링). Wi-Fi는 필요 없습니다.</string>
     <string name="mode_bt_hint">블루투스 설정에서 휴대폰과 PC를 페어링하고, 휴대폰에서 블루투스 테더링을 켜고 PC에서 해당 네트워크에 연결한 다음 QR 코드를 스캔하세요. Wi-Fi보다 느리며 오디오는 24 kHz로 전송됩니다.</string>
+    <string name="notif_mute">음소거</string>
+    <string name="notif_unmute">음소거 해제</string>
+    <string name="vol_title">볼륨 키로 마이크 음소거</string>
+    <string name="vol_hint">볼륨 버튼으로 음소거/해제합니다. 화면이 꺼져도 작동합니다. 다음 시작부터 적용됩니다.</string>
+    <string name="tile_label">마이크 음소거</string>
+    <string name="nearby_title">근처 PC</string>
+    <string name="nearby_none">이 네트워크에서 PC를 찾는 중…</string>
+    <string name="nearby_wait">“%1$s”에서 이 휴대폰을 허용하기를 기다리는 중…</string>
+    <string name="nearby_refused">PC가 거부했거나 제때 응답하지 않았습니다.</string>
+    <string name="hear_title">내 목소리 듣기(헤드폰)</string>
+    <string name="hear_hint">처리된 목소리를 이 휴대폰에서 다시 재생합니다. 헤드폰을 사용하지 않으면 하울링이 생깁니다. 블루투스에서는 사용할 수 없습니다.</string>
     <string name="err_addr">먼저 QR 코드를 스캔하거나 LarmaMic에 표시된 주소를 붙여넣으세요.</string>
 </resources>

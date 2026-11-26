@@ -74,6 +74,11 @@ class Store(ctx: Context) {
         get() = p.getString("mode", "wifi") ?: "wifi"
         set(v) = p.edit().putString("mode", v).apply()
 
+    /** Volume buttons mute/unmute the microphone (also with the screen off). */
+    var volumeKeys: Boolean
+        get() = p.getBoolean("volkeys", false)
+        set(v) = p.edit().putBoolean("volkeys", v).apply()
+
     fun pin(key: String): String? = p.getString("pin:$key", null)
     fun setPin(key: String, fingerprint: String?) {
         p.edit().apply { if (fingerprint == null) remove("pin:$key") else putString("pin:$key", fingerprint) }.apply()

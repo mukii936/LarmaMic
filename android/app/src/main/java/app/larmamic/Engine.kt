@@ -14,6 +14,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okio.ByteString
 import okio.ByteString.Companion.toByteString
 import org.json.JSONObject
 import java.security.MessageDigest
@@ -41,6 +42,10 @@ object Engine {
     val ptt = MutableStateFlow(false)
     val meter = MutableStateFlow(Meter())
     val pcLang = MutableStateFlow<String?>(null)
+
+    /** "Hear myself": the PC sends the processed voice back and it plays here (use headphones). */
+    val talkback = MutableStateFlow(false)
+    private var track: android.media.AudioTrack? = null
 
     /** Called when the engine stops on its own (wrong pairing code, certificate change). */
     @Volatile
@@ -101,6 +106,9 @@ object Engine {
         preset.value = null
         profile.value = null
         ptt.value = false
+        talkback.value = false
+        runCatching { track?.stop(); track?.release() }
+        track = null
     }
 
     private fun fail(m: Msg) {
@@ -132,6 +140,9 @@ object Engine {
         val bufBytes = maxOf(minBuf, frame * 2 * 4)
         val shorts = ShortArray(frame)
         val bytes = ByteArray(frame * 2)
+        val adpcm = useAdpcm()
+        val encoder = AdpcmEncoder()
+        val packed = ByteArray(4 + frame / 2)
 
         while (running) {
             var rec: AudioRecord? = null
@@ -141,17 +152,22 @@ object Engine {
                 rec.startRecording()
                 record = rec
                 // tell the PC the real rate (it resamples if it is not 48 kHz)
-                ws?.send(JSONObject().put("t", "hello").put("rate", rec.sampleRate).put("device", android.os.Build.MODEL).toString())
+                ws?.send(hello(rec.sampleRate))
                 while (running) {
                     val n = rec.read(shorts, 0, frame)
                     if (n <= 0) throw IllegalStateException("read failed: $n")
-                    for (i in 0 until n) {
-                        val s = shorts[i].toInt()
-                        bytes[2 * i] = s.toByte()
-                        bytes[2 * i + 1] = (s shr 8).toByte()
-                    }
                     val sock = ws
-                    if (sock != null && sock.queueSize() < 65536) sock.send(bytes.toByteString(0, n * 2))
+                    if (adpcm && n == frame) {
+                        val len = encoder.encode(shorts, n, packed)
+                        if (sock != null && sock.queueSize() < 65536) sock.send(packed.toByteString(0, len))
+                    } else if (!adpcm) {
+                        for (i in 0 until n) {
+                            val s = shorts[i].toInt()
+                            bytes[2 * i] = s.toByte()
+                            bytes[2 * i + 1] = (s shr 8).toByte()
+                        }
+                        if (sock != null && sock.queueSize() < 65536) sock.send(bytes.toByteString(0, n * 2))
+                    }
                 }
             } catch (_: Exception) {
                 // microphone taken by a call or another app: wait and try again while we are running
@@ -167,6 +183,41 @@ object Engine {
     // ---------------------------------------------------------------- network
 
     /** Trust on first use: the PC certificate is self-signed, so we pin its fingerprint the first time. */
+    /**
+     * Ask a PC found on the network for the pairing code. The PC shows Allow / Deny; when allowed it sends the code over
+     * this TLS connection. `onDone(null)` = refused, timed out or unreachable.
+     */
+    fun pair(pc: Pc, onDone: (Connection?) -> Unit) {
+        val key = "${pc.host}:${pc.port}"
+        store.setPin(key, null) // a fresh pairing trusts the certificate it sees now
+        val tm = Tofu(store, key)
+        val ctx = SSLContext.getInstance("TLS").apply { init(null, arrayOf(tm), SecureRandom()) }
+        val client = OkHttpClient.Builder()
+            .readTimeout(75, java.util.concurrent.TimeUnit.SECONDS)
+            .connectTimeout(6, java.util.concurrent.TimeUnit.SECONDS)
+            .sslSocketFactory(ctx.socketFactory, tm)
+            .hostnameVerifier { _, _ -> true }
+            .build()
+        val finished = java.util.concurrent.atomic.AtomicBoolean(false)
+        val finish = { c: Connection? -> if (finished.compareAndSet(false, true)) onDone(c) }
+        client.newWebSocket(
+            Request.Builder().url("wss://${pc.host}:${pc.port}/pair").build(),
+            object : WebSocketListener() {
+                override fun onOpen(webSocket: WebSocket, response: Response) {
+                    webSocket.send(JSONObject().put("t", "pair").put("device", android.os.Build.MODEL).toString())
+                }
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    val m = runCatching { JSONObject(text) }.getOrNull()
+                    val token = m?.optString("token").orEmpty()
+                    if (m?.optString("t") == "granted" && token.isNotEmpty()) finish(Connection(pc.host, pc.port, token)) else finish(null)
+                    webSocket.close(1000, null)
+                }
+                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) { finish(null) }
+                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) { finish(null) }
+            },
+        )
+    }
+
     private class Tofu(private val store: Store, private val key: String) : X509TrustManager {
         @Volatile var mismatch = false
         override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = throw CertificateException("client")
@@ -192,6 +243,15 @@ object Engine {
     /** Bluetooth tethering is slow, so send 24 kHz there; the PC resamples. */
     private fun captureRate() = if (mode.value == "bt") 24000 else 48000
 
+    /** Bluetooth tethering is slow: compress with IMA ADPCM (4:1) there. */
+    private fun useAdpcm() = mode.value == "bt"
+
+    private fun hello(rate: Int): String {
+        val j = JSONObject().put("t", "hello").put("rate", rate).put("device", android.os.Build.MODEL)
+        if (useAdpcm()) j.put("codec", "adpcm")
+        return j.toString()
+    }
+
     fun forgetPin(c: Connection) = store.setPin(c.key, null)
 
     private fun connect() {
@@ -214,7 +274,7 @@ object Engine {
     private val listener = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
             val rate = record?.sampleRate ?: 48000
-            webSocket.send(JSONObject().put("t", "hello").put("rate", rate).put("device", android.os.Build.MODEL).toString())
+            webSocket.send(hello(rate))
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
@@ -222,6 +282,7 @@ object Engine {
             val m = runCatching { JSONObject(text) }.getOrNull() ?: return
             when (m.optString("t")) {
                 "ready" -> {
+                    if (talkback.value) webSocket.send(JSONObject().put("t", "talkback").put("on", true).toString())
                     everReady = true
                     message.value = null
                     status.value = Status.LIVE
@@ -242,6 +303,12 @@ object Engine {
                     latency = m.optInt("lat"),
                 )
             }
+        }
+
+        override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+            if (webSocket !== ws || !talkback.value) return
+            val t = track ?: openTrack().also { track = it }
+            t.write(bytes.toByteArray(), 0, bytes.size)
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = dropped(webSocket, null)
@@ -315,6 +382,33 @@ object Engine {
     fun chooseProfile(name: String) {
         lastEdit = 0
         send(JSONObject().put("t", "profile").put("name", name))
+    }
+
+    private fun openTrack(): android.media.AudioTrack {
+        val min = android.media.AudioTrack.getMinBufferSize(48000, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
+        val t = android.media.AudioTrack.Builder()
+            .setAudioAttributes(
+                android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build(),
+            )
+            .setAudioFormat(
+                AudioFormat.Builder().setSampleRate(48000).setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build(),
+            )
+            .setBufferSizeInBytes(maxOf(min, 9600))
+            .setPerformanceMode(android.media.AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+            .build()
+        t.play()
+        return t
+    }
+
+    fun setTalkback(on: Boolean) {
+        talkback.value = on
+        if (!on) {
+            runCatching { track?.stop(); track?.release() }
+            track = null
+        }
+        send(JSONObject().put("t", "talkback").put("on", on))
     }
 
     fun calibrate() {

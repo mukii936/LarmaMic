@@ -106,5 +106,16 @@
     <string name="mode_wifi_hint">El teléfono y el PC deben estar en la misma Wi-Fi.</string>
     <string name="mode_usb_hint">Conecta el cable al PC y luego activa la depuración USB en el teléfono (se detecta sola) o la conexión USB compartida (Red &gt; Punto de acceso y conexión compartida). No hace falta Wi-Fi.</string>
     <string name="mode_bt_hint">Empareja el teléfono con el PC en los ajustes de Bluetooth, activa la conexión compartida por Bluetooth en el teléfono, únete a su red en el PC y escanea el código QR. Más lento que Wi-Fi: el audio se envía a 24 kHz.</string>
+    <string name="notif_mute">Silenciar</string>
+    <string name="notif_unmute">Activar sonido</string>
+    <string name="vol_title">Las teclas de volumen silencian el micrófono</string>
+    <string name="vol_hint">Pulsa un botón de volumen para silenciar o activar, incluso con la pantalla apagada. Se aplica en el próximo inicio.</string>
+    <string name="tile_label">Silenciar micrófono</string>
+    <string name="nearby_title">PC cercanos</string>
+    <string name="nearby_none">Buscando PC en esta red…</string>
+    <string name="nearby_wait">Esperando a que permitas este teléfono en «%1$s»…</string>
+    <string name="nearby_refused">El PC lo rechazó o no respondió a tiempo.</string>
+    <string name="hear_title">Escucharme (auriculares)</string>
+    <string name="hear_hint">Reproduce tu voz procesada en este teléfono. Usa auriculares o habrá acople. No disponible por Bluetooth.</string>
     <string name="err_addr">Primero escanea el código QR o pega la dirección que muestra LarmaMic.</string>
 </resources>

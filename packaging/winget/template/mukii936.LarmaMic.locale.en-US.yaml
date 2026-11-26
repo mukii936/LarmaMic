@@ -1,0 +1,19 @@
+PackageIdentifier: mukii936.LarmaMic
+PackageVersion: {{VERSION}}
+PackageLocale: en-US
+Publisher: mukii936
+PublisherUrl: https://github.com/mukii936
+PackageName: LarmaMic
+PackageUrl: https://github.com/mukii936/LarmaMic
+License: MIT
+LicenseUrl: https://github.com/mukii936/LarmaMic/blob/main/LICENSE
+ShortDescription: Use your phone (iPhone or Android) as a PC microphone.
+Description: LarmaMic turns phones into a PC microphone over Wi-Fi, USB cable or Bluetooth, with RNNoise noise removal and an equalizer, and outputs to a virtual microphone (VB-Cable or Steam Streaming Microphone).
+Moniker: larmamic
+Tags:
+  - microphone
+  - virtual-microphone
+  - noise-suppression
+  - rnnoise
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

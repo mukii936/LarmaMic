@@ -104,6 +104,8 @@ fun LarmaApp(
     onScan: () -> Unit,
     onAddress: (String) -> Unit,
     onForget: (Connection) -> Unit,
+    pairing: String?,
+    onPair: (Pc) -> Unit,
 ) {
     MaterialTheme(colorScheme = scheme) {
         val status by Engine.status.collectAsState()
@@ -135,7 +137,7 @@ fun LarmaApp(
                     if (params != null) {
                         Controls()
                     } else {
-                        ConnectionCard(connection, running, onMode, onScan, onAddress, onForget)
+                        ConnectionCard(connection, running, onMode, onScan, onAddress, onForget, pairing, onPair)
                     }
                     Spacer(Modifier.height(8.dp))
                 }
@@ -210,6 +212,8 @@ private fun ConnectionCard(
     onScan: () -> Unit,
     onAddress: (String) -> Unit,
     onForget: (Connection) -> Unit,
+    pairing: String?,
+    onPair: (Pc) -> Unit,
 ) {
     val mode by Engine.mode.collectAsState()
     var text by remember { mutableStateOf("") }
@@ -233,6 +237,8 @@ private fun ConnectionCard(
                 TextButton(onClick = { onForget(connection) }) { Text(stringResource(R.string.conn_forget), color = Warn, fontSize = 13.sp) }
             }
         }
+        NearbyPcs(running, pairing, onPair)
+        VolumeKeysRow()
         Button(onClick = onScan, enabled = !running, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.scan_btn)) }
         OutlinedTextField(
             value = text, onValueChange = { text = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
@@ -241,6 +247,33 @@ private fun ConnectionCard(
         OutlinedButton(onClick = { onAddress(text) }, enabled = text.isNotBlank() && !running, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.addr_connect), color = Ink)
         }
+    }
+}
+
+/** PCs found on the network: tap one, then allow this phone on the PC (no QR code). */
+@Composable
+private fun NearbyPcs(running: Boolean, pairing: String?, onPair: (Pc) -> Unit) {
+    val ctx = LocalContext.current
+    val pcs by Discovery.found.collectAsState()
+    DisposableEffect(Unit) {
+        Discovery.start(ctx)
+        onDispose { Discovery.stop() }
+    }
+    Text(stringResource(R.string.nearby_title), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+    if (pcs.isEmpty()) Text(stringResource(R.string.nearby_none), color = Mute, fontSize = 13.sp)
+    pcs.forEach { pc ->
+        Button(onClick = { onPair(pc) }, enabled = !running && pairing == null, modifier = Modifier.fillMaxWidth()) { Text(pc.label) }
+    }
+    if (pairing != null) Text(stringResource(R.string.nearby_wait, pairing), color = Sig, fontSize = 13.sp)
+}
+
+@Composable
+private fun VolumeKeysRow() {
+    val ctx = LocalContext.current
+    var on by remember { mutableStateOf(Store(ctx).volumeKeys) }
+    SwitchRow(stringResource(R.string.vol_title), stringResource(R.string.vol_hint), on) {
+        on = it
+        Store(ctx).volumeKeys = it
     }
 }
 
@@ -374,6 +407,9 @@ private fun Controls() {
             }
         }
         SwitchRow(stringResource(R.string.ptt_title), stringResource(R.string.ptt_hint), ptt) { Engine.enablePtt(it) }
+        val hear by Engine.talkback.collectAsState()
+        val mode by Engine.mode.collectAsState()
+        if (mode != "bt") SwitchRow(stringResource(R.string.hear_title), stringResource(R.string.hear_hint), hear) { Engine.setTalkback(it) }
 
         SECTIONS.forEach { sec ->
             HorizontalLine()

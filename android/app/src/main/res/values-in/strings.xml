@@ -106,5 +106,16 @@
     <string name="mode_wifi_hint">Ponsel dan PC harus berada di Wi-Fi yang sama.</string>
     <string name="mode_usb_hint">Colokkan kabel ke PC, lalu aktifkan Debugging USB di ponsel (terdeteksi otomatis) atau aktifkan tethering USB (Jaringan &gt; Hotspot dan tethering). Tidak perlu Wi-Fi.</string>
     <string name="mode_bt_hint">Pasangkan ponsel dengan PC di pengaturan Bluetooth, aktifkan tethering Bluetooth di ponsel dan gabung ke jaringannya di PC, lalu pindai kode QR. Lebih lambat dari Wi-Fi: audio dikirim pada 24 kHz.</string>
+    <string name="notif_mute">Bisukan</string>
+    <string name="notif_unmute">Aktifkan suara</string>
+    <string name="vol_title">Tombol volume membisukan mikrofon</string>
+    <string name="vol_hint">Tekan tombol volume untuk membisukan atau mengaktifkan suara, bahkan saat layar mati. Berlaku mulai pengaktifan berikutnya.</string>
+    <string name="tile_label">Bisukan mikrofon</string>
+    <string name="nearby_title">PC di sekitar</string>
+    <string name="nearby_none">Mencari PC di jaringan ini…</string>
+    <string name="nearby_wait">Menunggu Anda mengizinkan ponsel ini di “%1$s”…</string>
+    <string name="nearby_refused">PC menolak atau tidak menjawab tepat waktu.</string>
+    <string name="hear_title">Dengar suara sendiri (headphone)</string>
+    <string name="hear_hint">Memutar kembali suara yang sudah diproses di ponsel ini. Gunakan headphone agar tidak berdengung. Tidak tersedia lewat Bluetooth.</string>
     <string name="err_addr">Pindai kode QR dulu, atau tempel alamat yang tampil di LarmaMic.</string>
 </resources>

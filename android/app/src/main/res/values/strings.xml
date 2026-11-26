@@ -107,5 +107,16 @@
     <string name="mode_wifi_hint">The phone and the PC must be on the same Wi-Fi.</string>
     <string name="mode_usb_hint">Plug the cable into the PC, then either turn on USB debugging on the phone (detected automatically) or turn on USB tethering (Network &gt; Hotspot and tethering). No Wi-Fi needed.</string>
     <string name="mode_bt_hint">Pair the phone with the PC in Bluetooth settings, turn on Bluetooth tethering on the phone and join its network on the PC, then scan the QR code. Slower than Wi-Fi: audio is sent at 24 kHz.</string>
+    <string name="notif_mute">Mute</string>
+    <string name="notif_unmute">Unmute</string>
+    <string name="vol_title">Volume keys mute the mic</string>
+    <string name="vol_hint">Press a volume button to mute or unmute, even with the screen off. Takes effect the next time you start.</string>
+    <string name="tile_label">Mic mute</string>
+    <string name="nearby_title">Nearby PCs</string>
+    <string name="nearby_none">Searching for PCs on this network…</string>
+    <string name="nearby_wait">Waiting for you to allow this phone on “%1$s”…</string>
+    <string name="nearby_refused">The PC refused or did not answer in time.</string>
+    <string name="hear_title">Hear myself (headphones)</string>
+    <string name="hear_hint">Plays your processed voice back on this phone. Use headphones, otherwise you will get feedback. Not available over Bluetooth.</string>
     <string name="err_addr">Scan the QR code first, or paste the address shown in LarmaMic.</string>
 </resources>

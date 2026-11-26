@@ -165,6 +165,8 @@ pub struct App {
     lang_pref: String,
     /// "wifi" | "usb" | "bt": đổi địa chỉ đứng đầu trong QR và hướng dẫn hiện ra.
     conn_mode: String,
+    mix_loudest: bool,
+    no_discovery: bool,
     /// Ô chọn ngôn ngữ đang mở: đã nạp tạm font CJK để hiện tên các ngôn ngữ.
     menu_fonts: bool,
 }
@@ -236,6 +238,8 @@ impl App {
             no_beep,
             lang_pref,
             conn_mode,
+            mix_loudest: saved.mix_loudest,
+            no_discovery: saved.no_discovery,
             menu_fonts: false,
             sh,
             tx,
@@ -299,6 +303,8 @@ impl App {
             hotkey: self.hotkey.clone(),
             no_beep: self.no_beep,
             conn_mode: self.conn_mode.clone(),
+            mix_loudest: self.mix_loudest,
+            no_discovery: self.no_discovery,
             lang: if Lang::from_code(&self.lang_pref).is_some() { self.lang_pref.clone() } else { String::new() },
             profiles: self.sh.profiles.read().clone(),
             note: String::new(),
@@ -379,6 +385,30 @@ impl App {
             };
             ui.label(RichText::new(txt).size(22.0).strong().color(if connected { SIG } else { INK }));
         });
+        // điện thoại trong mạng xin ghép nối: hỏi người dùng
+        let pending: Vec<Arc<engine::PairReq>> = self.sh.pending.lock().clone();
+        for r in &pending {
+            ui.horizontal_wrapped(|ui| {
+                ui.label(RichText::new(tf("pair.req", &[&r.device])).color(SIG));
+                if ui.add(egui::Button::new(RichText::new(t("pair.allow")).color(ON_SIG)).fill(SIG)).clicked() {
+                    r.decision.store(1, Relaxed);
+                }
+                if ui.button(t("pair.deny")).clicked() {
+                    r.decision.store(2, Relaxed);
+                }
+            });
+        }
+        self.sh.mix_loudest.store(self.mix_loudest, Relaxed);
+        if sources.len() > 1 {
+            ui.horizontal(|ui| {
+                for (loud, key) in [(false, "mix.all"), (true, "mix.loudest")] {
+                    if ui.selectable_label(self.mix_loudest == loud, t(key)).on_hover_text(t("mix.hint")).clicked() && self.mix_loudest != loud {
+                        self.mix_loudest = loud;
+                        self.persist(true);
+                    }
+                }
+            });
+        }
         // Danh sách các điện thoại đang nối: tên, mức tiếng, tắt tiếng riêng, ngắt
         for s in &sources {
             ui.horizontal(|ui| {
@@ -392,6 +422,11 @@ impl App {
                 let muted = s.muted.load(Relaxed);
                 if ui.selectable_label(muted, t("chip.mute")).clicked() {
                     s.muted.store(!muted, Relaxed);
+                }
+                // độ lợi riêng của máy này
+                let mut db = 20.0 * f32::from_bits(s.gain.load(Relaxed)).max(0.001).log10();
+                if ui.add(egui::DragValue::new(&mut db).range(-12.0..=12.0).speed(0.1).fixed_decimals(0).suffix(" dB")).changed() {
+                    s.gain.store(10f32.powf(db / 20.0).to_bits(), Relaxed);
                 }
                 if ui.small_button("×").on_hover_text(t("src.kick")).clicked() {
                     s.kicked.store(true, Relaxed);
@@ -505,6 +540,12 @@ impl App {
                 ui.label(RichText::new(tf("pair.alt", &[&alt.join(", ")])).small().color(SIG));
             }
             ui.label(RichText::new(t("pair.cert")).small().color(MUTE));
+            let mut allow = !self.no_discovery;
+            if ui.checkbox(&mut allow, RichText::new(t("disc.toggle")).small()).on_hover_text(t("disc.hint")).changed() {
+                self.no_discovery = !allow;
+                self.sh.discovery.store(allow, Relaxed);
+                self.persist(true);
+            }
         }
 
         ui.add_space(14.0);

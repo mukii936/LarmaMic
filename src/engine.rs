@@ -21,6 +21,13 @@ pub fn now_ms() -> u64 {
     START.get_or_init(Instant::now).elapsed().as_millis() as u64
 }
 
+/// Một điện thoại đang xin ghép nối (tìm thấy PC qua mạng, chưa có mã). Người dùng bấm Cho phép / Từ chối trên PC.
+pub struct PairReq {
+    pub device: String,
+    /// 0 chờ, 1 cho phép, 2 từ chối.
+    pub decision: std::sync::atomic::AtomicU8,
+}
+
 /// Số điện thoại tối đa nối cùng lúc (máy thứ 5 vào thì máy cũ nhất bị ngắt).
 pub const MAX_SOURCES: usize = 4;
 
@@ -39,6 +46,8 @@ pub struct Source {
     pub kicked: AtomicBool,
     /// Đỉnh (tuyến tính, bit của f32) của gói mới nhất, để giao diện vẽ thanh mức.
     pub peak: AtomicU32,
+    /// Độ lợi riêng của máy này (tuyến tính, bit của f32), mặc định 1.0.
+    pub gain: AtomicU32,
     q: Mutex<SrcQ>,
 }
 
@@ -49,6 +58,15 @@ pub struct Shared {
     /// Tăng mỗi khi thông số đổi (từ app PC hoặc từ điện thoại) để các bên biết mà đồng bộ.
     pub params_ver: AtomicU64,
     pub sources: Mutex<Vec<Arc<Source>>>,
+    /// true = chỉ lấy máy đang nói to nhất thay vì trộn tất cả.
+    pub mix_loudest: AtomicBool,
+    /// Điện thoại đang chờ được cho phép ghép nối.
+    pub pending: Mutex<Vec<Arc<PairReq>>>,
+    /// Âm thanh đã xử lý (i16, 48 kHz) gửi ngược về điện thoại nào bật "nghe lại" (tai nghe).
+    pub talk: tokio::sync::broadcast::Sender<Vec<i16>>,
+    /// Cho phép điện thoại trong mạng tự tìm thấy PC và xin ghép nối.
+    pub discovery: AtomicBool,
+    pub last_pair: Mutex<Option<Instant>>,
     next_source: AtomicU64,
     pub out_q: Queue,
     pub out_rate: AtomicU32, // 0 = chưa có thiết bị xuất
@@ -140,6 +158,11 @@ impl Shared {
             params: RwLock::new(p),
             params_ver: AtomicU64::new(1),
             sources: Mutex::new(Vec::new()),
+            mix_loudest: AtomicBool::new(false),
+            pending: Mutex::new(Vec::new()),
+            talk: tokio::sync::broadcast::channel(8).0,
+            discovery: AtomicBool::new(true),
+            last_pair: Mutex::new(None),
             next_source: AtomicU64::new(1),
             out_q: Arc::new(Mutex::new(VecDeque::new())),
             out_rate: AtomicU32::new(0),
@@ -174,6 +197,7 @@ impl Shared {
             muted: AtomicBool::new(false),
             kicked: AtomicBool::new(false),
             peak: AtomicU32::new(0),
+            gain: AtomicU32::new(1.0f32.to_bits()),
             q: Mutex::new(SrcQ { q: VecDeque::new(), primed: false }),
         });
         {
@@ -310,6 +334,10 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
             let mut spec_pos = 0usize;
             let mut spec_tick = 0u32;
             let mut rec: Option<WavWriter> = None;
+            // ghi âm nhiều máy: mỗi máy thêm một file riêng (id máy -> file)
+            let mut tracks: std::collections::HashMap<u64, WavWriter> = std::collections::HashMap::new();
+            let mut rec_stem = String::new();
+            let mut last_loud: u64 = 0;
 
             loop {
                 let p = *sh.params.read();
@@ -319,6 +347,7 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                     1 if rec.is_none() => match start_recording() {
                         Ok((w, path)) => {
                             rec = Some(w);
+                            rec_stem = path.trim_end_matches(".wav").to_string();
                             *sh.rec_path.lock() = path;
                             *sh.rec_err.lock() = None;
                             sh.rec_frames.store(0, Relaxed);
@@ -327,6 +356,9 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                         Err(e) => *sh.rec_err.lock() = Some(e),
                     },
                     2 => {
+                        for (_, w) in tracks.drain() {
+                            let _ = w.finish();
+                        }
                         if let Some(w) = rec.take() {
                             if let Err(e) = w.finish() {
                                 *sh.rec_err.lock() = Some(tf("rec.err.close", &[&e.to_string()]));
@@ -360,10 +392,10 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                 let mut got = false;
                 if room {
                     let target = ((p.buf_ms / 1000.0 * SR) as usize).max(FRAME);
-                    // trộn mọi điện thoại đang nối: mỗi máy có hàng đợi và bộ đệm riêng
+                    // trộn các điện thoại đang nối: mỗi máy có hàng đợi và bộ đệm riêng
                     let srcs: Vec<Arc<Source>> = sh.sources.lock().clone();
-                    frame.iter_mut().for_each(|s| *s = 0.0);
-                    let (mut n, mut max_buf) = (0usize, 0usize);
+                    let mut parts: Vec<(Arc<Source>, Vec<f32>)> = Vec::new();
+                    let mut max_buf = 0usize;
                     for src in &srcs {
                         let mut iq = src.q.lock();
                         if !iq.primed && iq.q.len() >= target {
@@ -371,14 +403,8 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                         }
                         if iq.primed {
                             if iq.q.len() >= FRAME {
-                                let muted = src.muted.load(Relaxed);
-                                for s in frame.iter_mut() {
-                                    let v = iq.q.pop_front().unwrap_or(0.0);
-                                    if !muted {
-                                        *s += v;
-                                    }
-                                }
-                                n += 1;
+                                let v: Vec<f32> = (0..FRAME).map(|_| iq.q.pop_front().unwrap_or(0.0)).collect();
+                                parts.push((src.clone(), v));
                             } else {
                                 iq.primed = false;
                                 sh.under.fetch_add(1, Relaxed);
@@ -386,12 +412,47 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                         }
                         max_buf = max_buf.max(iq.q.len());
                     }
-                    if n > 1 {
-                        // nhiều người cùng nói: giảm mỗi máy theo căn bậc hai để khỏi vỡ tiếng
-                        let g = 1.0 / (n as f32).sqrt();
-                        frame.iter_mut().for_each(|s| *s *= g);
+                    // đang ghi âm và có từ 2 máy trở lên: mỗi máy thêm một track riêng (tiếng gốc, chưa xử lý)
+                    if rec.is_some() && srcs.len() > 1 {
+                        for (s, v) in &parts {
+                            let w = tracks.entry(s.id).or_insert_with(|| {
+                                let name: String = s.name.lock().chars().map(|c| if c.is_alphanumeric() { c } else { '_' }).collect();
+                                WavWriter::create(std::path::Path::new(&format!("{rec_stem}-{name}-{}.wav", s.id)), 48_000)
+                                    .unwrap_or_else(|_| WavWriter::create(std::path::Path::new(&format!("{rec_stem}-track{}.wav", s.id)), 48_000).expect("track file"))
+                            });
+                            let _ = w.write(v);
+                        }
                     }
-                    got = n > 0;
+                    frame.iter_mut().for_each(|s| *s = 0.0);
+                    let active: Vec<&(Arc<Source>, Vec<f32>)> = parts.iter().filter(|(s, _)| !s.muted.load(Relaxed)).collect();
+                    let gain_of = |s: &Source| f32::from_bits(s.gain.load(Relaxed));
+                    if sh.mix_loudest.load(Relaxed) && active.len() > 1 {
+                        // chỉ lấy máy đang nói to nhất; giữ máy cũ nếu nó chưa kém hẳn để khỏi nhảy qua lại
+                        let rms = |v: &Vec<f32>, g: f32| (v.iter().map(|x| x * x).sum::<f32>() / v.len() as f32).sqrt() * g;
+                        let scored: Vec<(u64, f32)> = active.iter().map(|(s, v)| (s.id, rms(v, gain_of(s)))).collect();
+                        let best = scored.iter().copied().fold((0u64, -1.0f32), |a, b| if b.1 > a.1 { b } else { a });
+                        let keep = scored.iter().find(|(id, r)| *id == last_loud && *r >= best.1 * 0.6).map(|x| x.0);
+                        last_loud = keep.unwrap_or(best.0);
+                        for (s, v) in active.iter().filter(|(s, _)| s.id == last_loud) {
+                            let g = gain_of(s);
+                            for (o, x) in frame.iter_mut().zip(v) {
+                                *o += x * g;
+                            }
+                        }
+                    } else {
+                        for (s, v) in &active {
+                            let g = gain_of(s);
+                            for (o, x) in frame.iter_mut().zip(v) {
+                                *o += x * g;
+                            }
+                        }
+                        if active.len() > 1 {
+                            // nhiều người cùng nói: giảm theo căn bậc hai để khỏi vỡ tiếng
+                            let g = 1.0 / (active.len() as f32).sqrt();
+                            frame.iter_mut().for_each(|s| *s *= g);
+                        }
+                    }
+                    got = !parts.is_empty();
                     sh.buf_ms.store((max_buf as f32 * 1000.0 / SR) as u32, Relaxed);
                 }
 
@@ -416,10 +477,18 @@ pub fn spawn_dsp(sh: Arc<Shared>) {
                 store_f(&sh.vad, info.vad);
                 sh.gate_open.store(info.gate_open, Relaxed);
 
+                if sh.talk.receiver_count() > 0 {
+                    let v: Vec<i16> = out.iter().map(|x| (x.clamp(-1.0, 1.0) * 32767.0) as i16).collect();
+                    let _ = sh.talk.send(v);
+                }
+
                 if let Some(w) = rec.as_mut() {
                     if let Err(e) = w.write(&out) {
                         *sh.rec_err.lock() = Some(tf("rec.err.write", &[&e.to_string()]));
                         rec = None;
+                        for (_, w) in tracks.drain() {
+                            let _ = w.finish();
+                        }
                         sh.rec_on.store(false, Relaxed);
                     } else {
                         sh.rec_frames.fetch_add(1, Relaxed);
